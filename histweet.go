@@ -1,11 +1,11 @@
 package main
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/go-twitter/twitter"
 )
 
 func main() {
-    fmt.Println("Hello, world!")
+	fmt.Println("Hello, world!")
 }
