@@ -30,8 +30,11 @@ jobs:
             dep ensure
         fi
 
-    - name: Build
-      run: go build -v .
+    - name: Build CLI
+      run: |
+        cd cli && go build -v -o histweet; cd ..
+        mkdir bin && mv cli/histweet bin/
 
-    - name: Test
-      run: go test -v .
+    - name: Test CLI
+      run: |
+        cd cli/ && go test -v .; cd ..
