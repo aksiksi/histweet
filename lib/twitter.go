@@ -15,7 +15,8 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 	totalCount := 0
 	var tweets []twitter.Tweet
 	var maxId int64 = 0
-	var timelineParams *twitter.UserTimelineParams
+
+	timelineParams := &twitter.UserTimelineParams{}
 
 	for {
 		if totalCount == 3200 {
@@ -23,13 +24,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 			break
 		}
 
-		if maxId == 0 {
-			timelineParams = &twitter.UserTimelineParams{}
-		} else {
-			timelineParams = &twitter.UserTimelineParams{
-				MaxID: maxId,
-			}
-		}
+		timelineParams.MaxID = maxId
 
 		// Fetch a set of tweets (max. 200)
 		returnedTweets, _, err := client.Timelines.UserTimeline(timelineParams)
@@ -44,7 +39,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 
 			if match {
 				tweets = append(tweets, tweet)
-				validCount = validCount + 1
+				validCount += 1
 			}
 		}
 
@@ -57,7 +52,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 		// API call
 		maxId = returnedTweets[len(returnedTweets)-1].ID
 
-		totalCount = totalCount + len(returnedTweets)
+		totalCount += len(returnedTweets)
 	}
 
 	return tweets, nil

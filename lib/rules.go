@@ -70,5 +70,9 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 		match = match && (res != nil)
 	}
 
+	if rule.Invert {
+		match = !match
+	}
+
 	return match, nil
 }

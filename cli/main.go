@@ -109,11 +109,11 @@ func handleCli(c *cli.Context) error {
 			ruleTime = &histweet.RuleTime{}
 
 			if before != nil {
-				ruleTime.Before = *before
+				ruleTime.Before = (*before).UTC()
 			}
 
 			if after != nil {
-				ruleTime.After = *after
+				ruleTime.After = (*after).UTC()
 			}
 		} else {
 			// Ignore before and after args if an age is provided
