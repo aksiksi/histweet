@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -42,20 +41,34 @@ func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
 	var months int
 	var years int
 
-	val, err := strconv.ParseInt(age[:len(age)-1], 10, 32)
-	if err != nil {
-		return nil, err
+	agePat := regexp.MustCompile(`(\d+d)?(\d+m)?(\d+y)?`)
+
+	matches := agePat.FindStringSubmatch(age)
+	if matches == nil {
+		return nil, errors.New(fmt.Sprintf("Invalid age string provided: %s", age))
 	}
 
-	// TODO: Allow for all three at once?
-	if strings.Contains(age, "d") {
-		days = int(val)
-	} else if strings.Contains(age, "m") {
-		months = int(val)
-	} else if strings.Contains(age, "y") {
-		years = int(val)
-	} else {
-		return nil, errors.New("Invalid age string provided: must contain \"d\", \"m\", or \"y\"")
+	for _, match := range matches[1:] {
+		if match == "" {
+			continue
+		}
+
+		val, err := strconv.ParseInt(match[:len(match)-1], 10, 32)
+		if err != nil {
+			return nil, err
+		}
+
+		// The last character of this match must be one of: d, m, or y
+		switch match[len(match)-1] {
+		case 'd':
+			days = int(val)
+		case 'm':
+			months = int(val)
+		case 'y':
+			years = int(val)
+		default:
+			return nil, errors.New("Invalid age string provided: must only contain \"d\", \"m\", or \"y\"")
+		}
 	}
 
 	// This is how you go back in time
@@ -319,7 +332,7 @@ func buildCliApp() *cli.App {
 		},
 		&cli.StringFlag{
 			Name:  "age",
-			Usage: "Delete all tweets older than this age (e.g., --age 30d or --age 1m or --age 1y)",
+			Usage: "Delete all tweets older than this age (ex: 10d, 1m, 1y, 1d6m, 1d3m1y)",
 		},
 		&cli.StringFlag{
 			Name:        "contains",
