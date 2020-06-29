@@ -13,7 +13,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/dghubble/go-twitter/twitter"
-	"github.com/dghubble/oauth1"
 
 	"github.com/aksiksi/histweet/lib"
 )
@@ -226,21 +225,13 @@ func Run(args *Args) error {
 
 	fmt.Println()
 
-	// Build the Twitter client
-	config := oauth1.NewConfig(args.ConsumerKey, args.ConsumerSecret)
-	token := oauth1.NewToken(args.AccessToken, args.AccessSecret)
-	httpClient := config.Client(oauth1.NoContext, token)
-	client := twitter.NewClient(httpClient)
-
-	// Verify the user
-	verifyParams := &twitter.AccountVerifyParams{
-		SkipStatus:   twitter.Bool(true),
-		IncludeEmail: twitter.Bool(true),
-	}
-
-	_, _, err := client.Accounts.VerifyCredentials(verifyParams)
+	client, err := histweet.NewTwitterClient(args.ConsumerKey,
+		args.ConsumerSecret,
+		args.AccessToken,
+		args.AccessSecret,
+		true)
 	if err != nil {
-		return errors.New("Invalid user credentials provided")
+		return err
 	}
 
 	if args.Daemon {
@@ -250,7 +241,7 @@ func Run(args *Args) error {
 	}
 }
 
-func main() {
+func buildCliApp() *cli.App {
 	// Define CLI flags
 	flags := []cli.Flag{
 		&cli.BoolFlag{
@@ -329,6 +320,12 @@ func main() {
 			return handleCli(c)
 		},
 	}
+
+	return app
+}
+
+func main() {
+	app := buildCliApp()
 
 	err := app.Run(os.Args)
 	if err != nil {

@@ -5,7 +5,36 @@ import (
 	"fmt"
 
 	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
 )
+
+func NewTwitterClient(
+	consumerKey string,
+	consumerSecret string,
+	accessToken string,
+	accessSecret string,
+	verify bool) (*twitter.Client, error) {
+	// Build the Twitter client
+	config := oauth1.NewConfig(consumerKey, consumerSecret)
+	token := oauth1.NewToken(accessToken, accessSecret)
+	httpClient := config.Client(oauth1.NoContext, token)
+	client := twitter.NewClient(httpClient)
+
+	// Verify the user
+	if verify {
+		verifyParams := &twitter.AccountVerifyParams{
+			SkipStatus:   twitter.Bool(true),
+			IncludeEmail: twitter.Bool(true),
+		}
+
+		_, _, err := client.Accounts.VerifyCredentials(verifyParams)
+		if err != nil {
+			return nil, errors.New("Invalid user credentials provided")
+		}
+	}
+
+	return client, nil
+}
 
 // Fetch all timeline tweets for a given user based on the provided `Rule`
 // This function sequentially calls the Twitter user timeline API without any
