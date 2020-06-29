@@ -12,8 +12,15 @@ import (
 // A time-based rule
 // One or both values can be set
 type RuleTime struct {
-	Before *time.Time
-	After  *time.Time
+	Before time.Time
+	After  time.Time
+}
+
+// Keep the N latest tweets
+// If `Latest` is set to `false`, delete the N latest tweets
+type RuleCount struct {
+	N      int
+	Latest bool
 }
 
 type RuleContains struct {
@@ -26,6 +33,9 @@ type RuleContains struct {
 type Rule struct {
 	// Delete tweets based on publication time
 	Time *RuleTime
+
+	// Delete tweets based on a fixed count
+	Count *RuleCount
 
 	// Delete all tweets that contain some text
 	Contains *RuleContains
@@ -45,12 +55,12 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 
 	// Check if we have a match in time-based rules
 	if rule.Time != nil {
-		if rule.Time.Before != nil {
-			match = match && createdAt.Before(*rule.Time.Before)
+		if !rule.Time.Before.IsZero() {
+			match = match && createdAt.Before(rule.Time.Before)
 		}
 
-		if rule.Time.After != nil {
-			match = match && createdAt.After(*rule.Time.After)
+		if !rule.Time.After.IsZero() {
+			match = match && createdAt.After(rule.Time.After)
 		}
 	}
 

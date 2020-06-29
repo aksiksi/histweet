@@ -7,8 +7,7 @@ import (
 	"github.com/dghubble/go-twitter/twitter"
 )
 
-// Fetch all timeline tweets for a given user
-// This function will stop once any of the time-based rules are met
+// Fetch all timeline tweets for a given user based on the provided `Rule`
 // This function sequentially calls the Twitter user timeline API without any
 // throttling
 func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, error) {

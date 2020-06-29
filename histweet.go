@@ -6,6 +6,9 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/urfave/cli/v2"
 
@@ -29,7 +32,40 @@ type Args struct {
 	AccessSecret   string
 
 	// Rule for tweet deletion
-	Rule *histweet.Rule
+	Rule histweet.Rule
+}
+
+// Given an age string, converts it into a time-based rule (`RuleTime`)
+func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
+	var days int
+	var months int
+	var years int
+
+	val, err := strconv.ParseInt(age[:len(age)-1], 10, 32)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Allow for all three at once?
+	if strings.Contains(age, "d") {
+		days = int(val)
+	} else if strings.Contains(age, "m") {
+		months = int(val)
+	} else if strings.Contains(age, "y") {
+		years = int(val)
+	} else {
+		return nil, errors.New("Invalid age string provided: must contain \"d\", \"m\", or \"y\"")
+	}
+
+	// This is how you go back in time
+	now := time.Now().UTC()
+	target := now.AddDate(-years, -months, -days)
+
+	ruleTime := &histweet.RuleTime{
+		Before: target,
+	}
+
+	return ruleTime, nil
 }
 
 // Handles the CLI arguments and calls into the histweet lib to run the command
@@ -39,6 +75,7 @@ func handleCli(c *cli.Context) error {
 	before := c.Timestamp("before")
 	after := c.Timestamp("after")
 	contains := c.String("contains")
+	age := c.String("age")
 	invert := c.Bool("invert")
 	noPrompt := c.Bool("no-prompt")
 
@@ -65,10 +102,29 @@ func handleCli(c *cli.Context) error {
 	}
 
 	// If we have a time-based rule, build it
-	if before != nil || after != nil {
-		ruleTime = &histweet.RuleTime{
-			Before: before,
-			After:  after,
+	// NOTE(aksiksi): Times are interpreted as UTC unless TZ info specified in
+	// input arg
+	if before != nil || after != nil || age != "" {
+		if age == "" {
+			ruleTime = &histweet.RuleTime{}
+
+			if before != nil {
+				ruleTime.Before = *before
+			}
+
+			if after != nil {
+				ruleTime.After = *after
+			}
+		} else {
+			// Ignore before and after args if an age is provided
+			log.Println("Age was specified; ignored the before/after arguments")
+
+			resultRuleTime, err := ConvertAgeToRuleTime(age)
+			if err != nil {
+				return err
+			}
+
+			ruleTime = resultRuleTime
 		}
 	}
 
@@ -79,7 +135,7 @@ func handleCli(c *cli.Context) error {
 
 	// TODO: Can we have a list of rules?
 	// CLI would only support a single rule, but lib can be flexible
-	rules := &histweet.Rule{
+	rule := histweet.Rule{
 		Time:     ruleTime,
 		Contains: ruleContains,
 		Invert:   invert,
@@ -94,7 +150,7 @@ func handleCli(c *cli.Context) error {
 		ConsumerSecret: consumerSecret,
 		AccessToken:    accessToken,
 		AccessSecret:   accessSecret,
-		Rule:           rules,
+		Rule:           rule,
 	}
 
 	// Run the command!
@@ -109,7 +165,7 @@ func handleCli(c *cli.Context) error {
 func runSingle(args *Args, client *twitter.Client) error {
 	// Fetch tweets based on provided rules
 	// For now, we assume that user wants to use the timeline API
-	tweets, err := histweet.FetchTimelineTweets(args.Rule, client)
+	tweets, err := histweet.FetchTimelineTweets(&args.Rule, client)
 	if err != nil {
 		return err
 	}
@@ -146,24 +202,29 @@ func runDaemon(args *Args, client *twitter.Client) error {
 }
 
 func Run(args *Args) error {
+	fmt.Println("\nRules")
+	fmt.Println("=====")
+
 	if args.Rule.Time != nil {
 		before := args.Rule.Time.Before
 		after := args.Rule.Time.After
 
-		if before != nil && after != nil {
-			fmt.Printf("Rule: delete all tweets between %s and %s\n",
+		if !before.IsZero() && !after.IsZero() {
+			fmt.Printf("  * Rule: delete all tweets between %s and %s\n",
 				after, before)
-		} else if before != nil {
-			fmt.Printf("Rule: delete all tweets before %s\n", before)
-		} else if before != nil {
-			fmt.Printf("Rule: delete all tweets after %s\n", after)
+		} else if !before.IsZero() {
+			fmt.Printf("  * Rule: delete all tweets before %s\n", before)
+		} else if !after.IsZero() {
+			fmt.Printf("  * Rule: delete all tweets after %s\n", after)
 		}
 	}
 
 	if args.Rule.Contains != nil {
-		fmt.Printf("Rule: delete all tweets that contain \"%s\"\n",
+		fmt.Printf("  * Rule: delete all tweets that contain \"%s\"\n",
 			args.Rule.Contains.Pattern)
 	}
+
+	fmt.Println()
 
 	// Build the Twitter client
 	config := oauth1.NewConfig(args.ConsumerKey, args.ConsumerSecret)
@@ -228,15 +289,19 @@ func main() {
 		},
 		&cli.TimestampFlag{
 			Name:        "before",
-			Usage:       "Delete all tweets before this time",
+			Usage:       "Delete all tweets before this time (UTC by default)",
 			Layout:      "2006-01-02T15:04:05",
 			DefaultText: "ignored",
 		},
 		&cli.TimestampFlag{
 			Name:        "after",
-			Usage:       "Delete all tweets after this time",
+			Usage:       "Delete all tweets after this time (UTC by default)",
 			Layout:      "2006-01-02T15:04:05",
 			DefaultText: "ignored",
+		},
+		&cli.StringFlag{
+			Name:  "age",
+			Usage: "Delete all tweets older than this age (e.g., --age 30d or --age 1m or --age 1y)",
 		},
 		&cli.StringFlag{
 			Name:        "contains",
