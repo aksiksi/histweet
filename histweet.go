@@ -13,6 +13,7 @@ import (
 // Handles the CLI arguments and calls into the histweet lib to run the command
 func handleCli(c *cli.Context) error {
 	daemon := c.Bool("daemon")
+	interval := c.Int("interval")
 	before := c.Timestamp("before")
 	after := c.Timestamp("after")
 	contains := c.String("contains")
@@ -31,7 +32,7 @@ func handleCli(c *cli.Context) error {
 
 	// If we have a contains rule, build it
 	if contains != "" {
-		pattern, err := regexp.Compile(c.String("contains"))
+		pattern, err := regexp.Compile(contains)
 		if err != nil {
 			return cli.Exit("Invalid regex pattern passed into \"contains\"", 1)
 		}
@@ -65,6 +66,7 @@ func handleCli(c *cli.Context) error {
 	// Build the args struct to run the command
 	args := &histweet.Args{
 		Daemon:         daemon,
+		Interval:       interval,
 		NoPrompt:       noPrompt,
 		ConsumerKey:    consumerKey,
 		ConsumerSecret: consumerSecret,
@@ -76,7 +78,7 @@ func handleCli(c *cli.Context) error {
 	// Run the command!
 	err := histweet.Run(args)
 	if err != nil {
-		return cli.Exit("Failed to run the CLI", 1)
+		return err
 	}
 
 	return nil
@@ -85,11 +87,18 @@ func handleCli(c *cli.Context) error {
 func main() {
 	// Define the histweet CLI
 	app := &cli.App{
+		Name:  "histweet",
+		Usage: "Manage your tweets via an intuitive CLI",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "daemon",
 				Value: false,
 				Usage: "Run the CLI in daemon mode",
+			},
+			&cli.IntFlag{
+				Name:  "interval",
+				Value: 30,
+				Usage: "Interval at which to check for tweets, in seconds",
 			},
 			&cli.StringFlag{
 				Name:     "consumer-key",
@@ -105,31 +114,31 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:     "access-token",
-				Usage:    "Twitter API acccess token",
+				Usage:    "Twitter API access token",
 				EnvVars:  []string{"HISTWEET_ACCESS_TOKEN"},
 				Required: true,
 			},
 			&cli.StringFlag{
 				Name:     "access-secret",
-				Usage:    "Twitter API acccess secret",
+				Usage:    "Twitter API access secret",
 				EnvVars:  []string{"HISTWEET_ACCESS_SECRET"},
 				Required: true,
 			},
 			&cli.TimestampFlag{
 				Name:        "before",
-				Usage:       "Delete all tweets before this time.",
+				Usage:       "Delete all tweets before this time",
 				Layout:      "2006-01-02T15:04:05",
 				DefaultText: "ignored",
 			},
 			&cli.TimestampFlag{
 				Name:        "after",
-				Usage:       "Delete all tweets after this time.",
+				Usage:       "Delete all tweets after this time",
 				Layout:      "2006-01-02T15:04:05",
 				DefaultText: "ignored",
 			},
 			&cli.StringFlag{
 				Name:        "contains",
-				Usage:       "Delete all tweets that match a regex pattern.",
+				Usage:       "Delete all tweets that match a regex pattern",
 				DefaultText: "ignored",
 			},
 			&cli.BoolFlag{

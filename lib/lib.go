@@ -2,15 +2,11 @@ package histweet
 
 import (
 	"fmt"
+
+	"github.com/dghubble/go-twitter/twitter"
 )
 
-func runSingle(args *Args) error {
-	// Build the Twitter client
-	client, err := newTwitterClient(args)
-	if err != nil {
-		return err
-	}
-
+func runSingle(args *Args, client *twitter.Client) error {
 	// Fetch tweets based on provided rules
 	// For now, we assume that user wants to use the timeline API
 	tweets, err := fetchTimelineTweets(args.Rule, client)
@@ -45,7 +41,7 @@ func runSingle(args *Args) error {
 	return nil
 }
 
-func runDaemon(args *Args) error {
+func runDaemon(args *Args, client *twitter.Client) error {
 	return nil
 }
 
@@ -69,9 +65,15 @@ func Run(args *Args) error {
 			args.Rule.Contains.Pattern)
 	}
 
+	// Build the Twitter client
+	client, err := newTwitterClient(args)
+	if err != nil {
+		return err
+	}
+
 	if args.Daemon {
-		return runDaemon(args)
+		return runDaemon(args, client)
 	} else {
-		return runSingle(args)
+		return runSingle(args, client)
 	}
 }

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	// "regexp"
-	// "time"
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"

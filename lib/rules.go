@@ -67,6 +67,7 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 type Args struct {
 	// Whether or not to run in daemon mode
 	Daemon   bool
+	Interval int
 	NoPrompt bool
 
 	// Twitter API key
