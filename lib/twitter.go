@@ -3,42 +3,15 @@ package histweet
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/dghubble/go-twitter/twitter"
-	"github.com/dghubble/oauth1"
 )
-
-// Builds a new Twitter client with given args
-func newTwitterClient(args *Args) (*twitter.Client, error) {
-	config := oauth1.NewConfig(args.ConsumerKey, args.ConsumerSecret)
-	token := oauth1.NewToken(args.AccessToken, args.AccessSecret)
-	httpClient := config.Client(oauth1.NoContext, token)
-
-	// Twitter client
-	client := twitter.NewClient(httpClient)
-
-	// Verify the user
-	verifyParams := &twitter.AccountVerifyParams{
-		SkipStatus:   twitter.Bool(true),
-		IncludeEmail: twitter.Bool(true),
-	}
-
-	_, _, err := client.Accounts.VerifyCredentials(verifyParams)
-	if err != nil {
-		return nil, errors.New("Invalid user credentials provided")
-	}
-
-	log.Println("Verified user!")
-
-	return client, nil
-}
 
 // Fetch all timeline tweets for a given user
 // This function will stop once any of the time-based rules are met
 // This function sequentially calls the Twitter user timeline API without any
 // throttling
-func fetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, error) {
+func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, error) {
 	validCount := 0
 	totalCount := 0
 	var tweets []twitter.Tweet
@@ -91,7 +64,7 @@ func fetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 	return tweets, nil
 }
 
-func deleteTweets(tweets []twitter.Tweet, client *twitter.Client) error {
+func DeleteTweets(tweets []twitter.Tweet, client *twitter.Client) error {
 	for i := 0; i < len(tweets); i++ {
 		_, _, err := client.Statuses.Destroy(tweets[i].ID, &twitter.StatusDestroyParams{})
 		if err != nil {

@@ -62,20 +62,3 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 
 	return match, nil
 }
-
-// CLI args struct
-type Args struct {
-	// Whether or not to run in daemon mode
-	Daemon   bool
-	Interval int
-	NoPrompt bool
-
-	// Twitter API key
-	ConsumerKey    string
-	ConsumerSecret string
-	AccessToken    string
-	AccessSecret   string
-
-	// Rule for tweet deletion
-	Rule *Rule
-}
