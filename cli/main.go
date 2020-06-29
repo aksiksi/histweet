@@ -17,6 +17,8 @@ import (
 	"github.com/aksiksi/histweet/lib"
 )
 
+const MIN_DAEMON_INTERVAL = 30
+
 // CLI args struct
 type Args struct {
 	// Whether or not to run in daemon mode
@@ -171,18 +173,18 @@ func runSingle(args *Args, client *twitter.Client) error {
 
 	numTweets := len(tweets)
 
-	if numTweets > 0 {
-		fmt.Printf("Delete %d tweets that match the above? [y/n] ", len(tweets))
-	} else {
+	if numTweets == 0 {
 		fmt.Println("No tweets to delete that match the given rule(s).")
 		return nil
 	}
 
 	// Wait for user to confirm
 	if !args.NoPrompt && !args.Daemon {
+		fmt.Printf("Delete %d tweets that match the above? [y/n] ", len(tweets))
+
 		var input string
 		fmt.Scanf("%s", &input)
-		if input == "n" {
+		if input != "y" {
 			fmt.Println("Aborting...")
 			return nil
 		}
@@ -193,10 +195,35 @@ func runSingle(args *Args, client *twitter.Client) error {
 		return err
 	}
 
+	log.Printf("Deleted %d tweets!", numTweets)
+
 	return nil
 }
 
+// Run the CLI in daemon mode
+// The CLI will continously poll the user's timeline and delete any tweets
+// that match the specified rules.
 func runDaemon(args *Args, client *twitter.Client) error {
+	interval := time.Duration(args.Interval)
+	if interval < MIN_DAEMON_INTERVAL {
+		return errors.New(fmt.Sprintf("The minimum daemon interal is %d", MIN_DAEMON_INTERVAL))
+	}
+
+	ticker := time.NewTicker(interval * time.Second)
+
+	fmt.Printf("Running in daemon mode (interval = %ds)...\n", interval)
+
+	for {
+		select {
+		case <-ticker.C:
+			err := runSingle(args, client)
+			if err != nil {
+				log.Fatalf("Failed: %s", err.Error())
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -251,7 +278,7 @@ func buildCliApp() *cli.App {
 		},
 		&cli.IntFlag{
 			Name:  "interval",
-			Value: 30,
+			Value: MIN_DAEMON_INTERVAL,
 			Usage: "Interval at which to check for tweets, in seconds",
 		},
 		&cli.StringFlag{
