@@ -17,6 +17,7 @@ func handleCli(c *cli.Context) error {
 	after := c.Timestamp("after")
 	contains := c.String("contains")
 	invert := c.Bool("invert")
+	noPrompt := c.Bool("no-prompt")
 
 	// Twitter API info
 	consumerKey := c.String("consumer-key")
@@ -55,7 +56,7 @@ func handleCli(c *cli.Context) error {
 
 	// TODO: Can we have a list of rules?
 	// CLI would only support a single rule, but lib can be flexible
-	rules := &histweet.Rules{
+	rules := &histweet.Rule{
 		Time:     ruleTime,
 		Contains: ruleContains,
 		Invert:   invert,
@@ -64,11 +65,12 @@ func handleCli(c *cli.Context) error {
 	// Build the args struct to run the command
 	args := &histweet.Args{
 		Daemon:         daemon,
+		NoPrompt:       noPrompt,
 		ConsumerKey:    consumerKey,
 		ConsumerSecret: consumerSecret,
 		AccessToken:    accessToken,
 		AccessSecret:   accessSecret,
-		Rules:          rules,
+		Rule:           rules,
 	}
 
 	// Run the command!
@@ -134,6 +136,11 @@ func main() {
 				Name:  "invert",
 				Value: false,
 				Usage: "Delete tweets that do _not_ match the specified rules",
+			},
+			&cli.BoolFlag{
+				Name:  "no-prompt",
+				Value: false,
+				Usage: "Do not prompt user to confirm deletion - ignored in daemon mode",
 			},
 		},
 		Action: func(c *cli.Context) error {
