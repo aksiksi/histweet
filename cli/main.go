@@ -16,7 +16,9 @@ import (
 	"github.com/aksiksi/histweet/lib"
 )
 
-const MIN_DAEMON_INTERVAL = 30
+const (
+	MIN_DAEMON_INTERVAL = 30
+)
 
 // CLI args struct
 type Args struct {
@@ -36,7 +38,7 @@ type Args struct {
 }
 
 // Given an age string, converts it into a time-based rule (`RuleTime`)
-func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
+func ConvertAgeToTime(age string) (time.Time, error) {
 	var days int
 	var months int
 	var years int
@@ -45,7 +47,7 @@ func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
 
 	matches := agePat.FindStringSubmatch(age)
 	if matches == nil {
-		return nil, errors.New(fmt.Sprintf("Invalid age string provided: %s", age))
+		return time.Time{}, errors.New(fmt.Sprintf("Invalid age string provided: %s", age))
 	}
 
 	for _, match := range matches[1:] {
@@ -55,7 +57,7 @@ func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
 
 		val, err := strconv.ParseInt(match[:len(match)-1], 10, 32)
 		if err != nil {
-			return nil, err
+			return time.Time{}, err
 		}
 
 		// The last character of this match must be one of: d, m, or y
@@ -67,7 +69,7 @@ func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
 		case 'y':
 			years = int(val)
 		default:
-			return nil, errors.New("Invalid age string provided: must only contain \"d\", \"m\", or \"y\"")
+			return time.Time{}, errors.New("Invalid age string provided: must only contain \"d\", \"m\", or \"y\"")
 		}
 	}
 
@@ -75,23 +77,25 @@ func ConvertAgeToRuleTime(age string) (*histweet.RuleTime, error) {
 	now := time.Now().UTC()
 	target := now.AddDate(-years, -months, -days)
 
-	ruleTime := &histweet.RuleTime{
-		Before: target,
-	}
-
-	return ruleTime, nil
+	return target, nil
 }
 
 // Handles the CLI arguments and calls into the histweet lib to run the command
 func handleCli(c *cli.Context) error {
-	daemon := c.Bool("daemon")
-	interval := c.Int("interval")
 	before := c.Timestamp("before")
 	after := c.Timestamp("after")
-	contains := c.String("contains")
 	age := c.String("age")
+	contains := c.String("contains")
+	maxLikes := c.Int("max-likes")
+	maxReplies := c.Int("max-replies")
+	maxRetweets := c.Int("max-retweets")
+	count := c.Int("count")
 	invert := c.Bool("invert")
 	noPrompt := c.Bool("no-prompt")
+	daemon := c.Bool("daemon")
+	interval := c.Int("interval")
+
+	isRuleProvided := false
 
 	// Twitter API info
 	consumerKey := c.String("consumer-key")
@@ -100,59 +104,78 @@ func handleCli(c *cli.Context) error {
 	accessSecret := c.String("access-secret")
 
 	// Pointer to each of the available rule types
-	var ruleTime *histweet.RuleTime
-	var ruleContains *histweet.RuleContains
+	var ruleTweet *histweet.RuleTweet
+	var ruleCount *histweet.RuleCount
 
-	// If we have a contains rule, build it
-	if contains != "" {
-		pattern, err := regexp.Compile(contains)
-		if err != nil {
-			return cli.Exit("Invalid regex pattern passed into \"contains\"", 1)
+	if c.IsSet("count") {
+		// Count-based rule
+		ruleCount = &histweet.RuleCount{
+			N: count,
 		}
 
-		ruleContains = &histweet.RuleContains{
-			Pattern: pattern,
-		}
-	}
+		isRuleProvided = true
+	} else if c.IsSet("before") || c.IsSet("after") || c.IsSet("age") || c.IsSet("contains") {
+		// Tweet-based rule
+		ruleTweet = &histweet.RuleTweet{}
 
-	// If we have a time-based rule, build it
-	// NOTE(aksiksi): Times are interpreted as UTC unless TZ info specified in
-	// input arg
-	if before != nil || after != nil || age != "" {
-		if age == "" {
-			ruleTime = &histweet.RuleTime{}
-
-			if before != nil {
-				ruleTime.Before = (*before).UTC()
-			}
-
-			if after != nil {
-				ruleTime.After = (*after).UTC()
-			}
-		} else {
+		// NOTE(aksiksi): Times are interpreted as UTC unless TZ info specified in
+		// input date
+		if c.IsSet("age") {
 			// Ignore before and after args if an age is provided
 			log.Println("Age was specified; ignored the before/after arguments")
 
-			resultRuleTime, err := ConvertAgeToRuleTime(age)
+			resultTime, err := ConvertAgeToTime(age)
 			if err != nil {
 				return err
 			}
 
-			ruleTime = resultRuleTime
+			ruleTweet.Before = resultTime
+		} else if c.IsSet("before") || c.IsSet("after") {
+			if before != nil {
+				ruleTweet.Before = (*before).UTC()
+			}
+
+			if after != nil {
+				ruleTweet.After = (*after).UTC()
+			}
 		}
+
+		// If we have a contains rule, build it
+		if c.IsSet("contains") {
+			pattern, err := regexp.Compile(contains)
+			if err != nil {
+				return cli.Exit("Invalid regex pattern passed into \"contains\"", 1)
+			}
+
+			ruleTweet.Contains = pattern
+		}
+
+		// Check for other tweet-based rules
+		if c.IsSet("max-likes") {
+			ruleTweet.MaxLikes = maxLikes
+		}
+
+		if c.IsSet("max-replies") {
+			ruleTweet.MaxReplies = maxReplies
+		}
+
+		if c.IsSet("max-retweets") {
+			ruleTweet.MaxRetweets = maxRetweets
+		}
+
+		isRuleProvided = true
 	}
 
 	// If no rules were provided, let's bail out here
-	if ruleTime == nil && ruleContains == nil {
+	if !isRuleProvided {
 		return cli.Exit("No rules provided... aborting", 1)
 	}
 
-	// TODO: Can we have a list of rules?
-	// CLI would only support a single rule, but lib can be flexible
+	// Build the combined rule
 	rule := histweet.Rule{
-		Time:     ruleTime,
-		Contains: ruleContains,
-		Invert:   invert,
+		Tweet:  ruleTweet,
+		Count:  ruleCount,
+		Invert: invert,
 	}
 
 	// Build the args struct to run the command
@@ -187,13 +210,13 @@ func runSingle(args *Args, client *twitter.Client) error {
 	numTweets := len(tweets)
 
 	if numTweets == 0 {
-		fmt.Println("No tweets to delete that match the given rule(s).")
+		fmt.Println("\nNo tweets to delete that match the given rule(s).")
 		return nil
 	}
 
 	// Wait for user to confirm
 	if !args.NoPrompt && !args.Daemon {
-		fmt.Printf("Delete %d tweets that match the above? [y/n] ", len(tweets))
+		fmt.Printf("\nDelete %d tweets that match the above? [y/n] ", len(tweets))
 
 		var input string
 		fmt.Scanf("%s", &input)
@@ -224,7 +247,7 @@ func runDaemon(args *Args, client *twitter.Client) error {
 
 	ticker := time.NewTicker(interval * time.Second)
 
-	fmt.Printf("Running in daemon mode (interval = %ds)...\n", interval)
+	fmt.Printf("\nRunning in daemon mode (interval = %ds)...\n", interval)
 
 	for {
 		select {
@@ -244,9 +267,9 @@ func Run(args *Args) error {
 	fmt.Println("\nRules")
 	fmt.Println("=====")
 
-	if args.Rule.Time != nil {
-		before := args.Rule.Time.Before
-		after := args.Rule.Time.After
+	if args.Rule.Tweet != nil {
+		before := args.Rule.Tweet.Before
+		after := args.Rule.Tweet.After
 
 		if !before.IsZero() && !after.IsZero() {
 			fmt.Printf("  * Rule: delete all tweets between %s and %s\n",
@@ -256,14 +279,15 @@ func Run(args *Args) error {
 		} else if !after.IsZero() {
 			fmt.Printf("  * Rule: delete all tweets after %s\n", after)
 		}
+
+		if args.Rule.Tweet.Contains != nil {
+			fmt.Printf("  * Rule: delete all tweets that contain \"%s\"\n", args.Rule.Tweet.Contains)
+		}
 	}
 
-	if args.Rule.Contains != nil {
-		fmt.Printf("  * Rule: delete all tweets that contain \"%s\"\n",
-			args.Rule.Contains.Pattern)
+	if args.Rule.Count != nil {
+		fmt.Printf("  * Rule: keep only the latest %d tweets", args.Rule.Count.N)
 	}
-
-	fmt.Println()
 
 	client, err := histweet.NewTwitterClient(args.ConsumerKey,
 		args.ConsumerSecret,
@@ -284,16 +308,6 @@ func Run(args *Args) error {
 func buildCliApp() *cli.App {
 	// Define CLI flags
 	flags := []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "daemon",
-			Value: false,
-			Usage: "Run the CLI in daemon mode",
-		},
-		&cli.IntFlag{
-			Name:  "interval",
-			Value: MIN_DAEMON_INTERVAL,
-			Usage: "Interval at which to check for tweets, in seconds",
-		},
 		&cli.StringFlag{
 			Name:     "consumer-key",
 			Usage:    "Twitter API consumer key",
@@ -339,6 +353,22 @@ func buildCliApp() *cli.App {
 			Usage:       "Delete all tweets that match a regex pattern",
 			DefaultText: "ignored",
 		},
+		&cli.IntFlag{
+			Name:  "max-likes",
+			Usage: "Only tweets with fewer likes will be deleted",
+		},
+		&cli.IntFlag{
+			Name:  "max-replies",
+			Usage: "Only tweets with fewer replies will be deleted",
+		},
+		&cli.IntFlag{
+			Name:  "max-retweets",
+			Usage: "Only tweets with fewer retweets will be deleted",
+		},
+		&cli.IntFlag{
+			Name:  "count",
+			Usage: "Only keep the \"count\" most recent tweets (all other rules are ignored!)",
+		},
 		&cli.BoolFlag{
 			Name:  "invert",
 			Value: false,
@@ -348,6 +378,16 @@ func buildCliApp() *cli.App {
 			Name:  "no-prompt",
 			Value: false,
 			Usage: "Do not prompt user to confirm deletion - ignored in daemon mode",
+		},
+		&cli.BoolFlag{
+			Name:  "daemon",
+			Value: false,
+			Usage: "Run the CLI in daemon mode",
+		},
+		&cli.IntFlag{
+			Name:  "interval",
+			Value: MIN_DAEMON_INTERVAL,
+			Usage: "Interval at which to check for tweets, in seconds",
 		},
 	}
 

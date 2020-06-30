@@ -8,6 +8,10 @@ import (
 	"github.com/dghubble/oauth1"
 )
 
+const (
+	MAX_TIMELINE_TWEETS = 3200
+)
+
 func NewTwitterClient(
 	consumerKey string,
 	consumerSecret string,
@@ -42,14 +46,14 @@ func NewTwitterClient(
 func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, error) {
 	validCount := 0
 	totalCount := 0
-	var tweets []twitter.Tweet
+	tweets := make([]twitter.Tweet, 0, MAX_TIMELINE_TWEETS)
 	var maxId int64 = 0
 
 	timelineParams := &twitter.UserTimelineParams{}
 
 	for {
-		if totalCount == 3200 {
-			// We've hit the absolute max for this API, stop here
+		if totalCount == MAX_TIMELINE_TWEETS {
+			// We've hit the absolute max for this API, so stop here
 			break
 		}
 
@@ -61,14 +65,32 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 			return nil, errors.New(fmt.Sprintf("Something went wrong while fetching timeline tweets: %s", err.Error()))
 		}
 
-		// Figure out if any of these tweets match the given rules
-		for i := 0; i < len(returnedTweets); i++ {
-			tweet := returnedTweets[i]
-			match, _ := rule.IsMatch(&tweet)
+		if rule.Count != nil {
+			n := rule.Count.N
 
-			if match {
-				tweets = append(tweets, tweet)
-				validCount += 1
+			// A count-based rule was provided, so ignore all per-tweet checks
+			if (totalCount + len(returnedTweets)) > n {
+				// Figure out where to start deleting from in the returned
+				// tweets slice
+				startIdx := (n - totalCount)
+				if startIdx < 0 {
+					startIdx = 0
+				}
+
+				tweetsToCopy := returnedTweets[startIdx:]
+
+				tweets = append(tweets, tweetsToCopy...)
+			}
+		} else {
+			// Figure out if any of these tweets match the given rules
+			for i := 0; i < len(returnedTweets); i++ {
+				tweet := returnedTweets[i]
+				match, _ := rule.IsMatch(&tweet)
+
+				if match {
+					tweets = append(tweets, tweet)
+					validCount++
+				}
 			}
 		}
 
