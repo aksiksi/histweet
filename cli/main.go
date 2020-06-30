@@ -320,14 +320,14 @@ func buildCliApp() *cli.App {
 		},
 		&cli.TimestampFlag{
 			Name:        "before",
-			Usage:       "Delete all tweets before this time (UTC by default)",
-			Layout:      "2006-01-02T15:04:05",
+			Usage:       "Delete all tweets before this time (ex: 2020-May-10)",
+			Layout:      "2006-Jan-02",
 			DefaultText: "ignored",
 		},
 		&cli.TimestampFlag{
 			Name:        "after",
-			Usage:       "Delete all tweets after this time (UTC by default)",
-			Layout:      "2006-01-02T15:04:05",
+			Usage:       "Delete all tweets after this time (ex: 2020-May-10)",
+			Layout:      "2006-Jan-02",
 			DefaultText: "ignored",
 		},
 		&cli.StringFlag{
