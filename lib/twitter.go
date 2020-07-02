@@ -40,10 +40,11 @@ func NewTwitterClient(
 	return client, nil
 }
 
-// Fetch all timeline tweets for a given user based on the provided `Rule`
+// Fetch all timeline tweets for a given user based on the provided `Rule`.
 // This function sequentially calls the Twitter user timeline API without any
-// throttling
-func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, error) {
+// throttling.
+func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]int64, error) {
+	// TODO: Handle throttling gracefully here
 	validCount := 0
 	totalCount := 0
 	tweets := make([]twitter.Tweet, 0, MAX_TIMELINE_TWEETS)
@@ -106,12 +107,19 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 		totalCount += len(returnedTweets)
 	}
 
-	return tweets, nil
+	// Build an array of tweet IDs to return for deletion
+	tweetIds := make([]int64, len(tweets))
+	for i, tweet := range tweets {
+		tweetIds[i] = tweet.ID
+	}
+
+	return tweetIds, nil
 }
 
-func DeleteTweets(tweets []twitter.Tweet, client *twitter.Client) error {
-	for _, tweet := range tweets {
-		_, _, err := client.Statuses.Destroy(tweet.ID, &twitter.StatusDestroyParams{})
+func DeleteTweets(tweets []int64, client *twitter.Client) error {
+	// TODO: Handle throttling gracefully here
+	for _, tweetId := range tweets {
+		_, _, err := client.Statuses.Destroy(tweetId, &twitter.StatusDestroyParams{})
 		if err != nil {
 			return err
 		}

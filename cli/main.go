@@ -106,6 +106,11 @@ func buildCliApp() *cli.App {
 			Aliases: []string{"t"},
 			Usage:   "Delete all tweets with fewer than `N` retweets",
 		},
+		&cli.StringFlag{
+			Name:        "archive",
+			Usage:       "Path to tweet archive `file` (tweet.js)",
+			DefaultText: "Timeline API lookup",
+		},
 		&cli.BoolFlag{
 			Name:  "invert",
 			Value: false,

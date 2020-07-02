@@ -40,8 +40,16 @@ In this example, we delete all tweets that are:
 3. Contain the word "dt" (as a regex pattern)
 
 ```
-./histweet rules --age 3m5d --max-likes 3 --match '\sdt(\s|\.|$)'
+histweet rules --age 3m5d --max-likes 3 --match '\sdt(\s|\.|$)'
 ```
+
+To point `histweet` at your archive JSON, add the `--archive` flag like so:
+
+```
+histweet rules --age 3m5d --max-likes 3 --match '\sdt(\s|\.|$)' --archive /path/to/tweet.js
+```
+
+The tool will now run the rules against the contents of your archive, and then use the Twitter API to delete all matching tweets. **Note:** the archive does not contain number of replies, so that rule is simply *ignored*.
 
 You can view full usage by passing in the `-h` flag.
 

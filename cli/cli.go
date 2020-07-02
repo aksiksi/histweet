@@ -25,6 +25,7 @@ type Args struct {
 	Daemon   bool
 	Interval int
 	NoPrompt bool
+	Archive  string
 
 	// Twitter API key
 	ConsumerKey    string
@@ -80,14 +81,24 @@ func ConvertAgeToTime(age string) (time.Time, error) {
 }
 
 func runSingle(args *Args, client *twitter.Client) error {
-	// Fetch tweets based on provided rules
-	// For now, we assume that user wants to use the timeline API
-	tweets, err := histweet.FetchTimelineTweets(&args.Rule, client)
-	if err != nil {
-		return err
+	var tweetIds []int64
+	var err error
+
+	if args.Archive == "" {
+		// Fetch tweets based on provided rules
+		// For now, we assume that user wants to use the timeline API
+		tweetIds, err = histweet.FetchTimelineTweets(&args.Rule, client)
+		if err != nil {
+			return err
+		}
+	} else {
+		tweetIds, err = histweet.FetchArchiveTweets(&args.Rule, args.Archive)
+		if err != nil {
+			return err
+		}
 	}
 
-	numTweets := len(tweets)
+	numTweets := len(tweetIds)
 
 	if numTweets == 0 {
 		fmt.Println("\nNo tweets to delete that match the given rule(s).")
@@ -96,7 +107,7 @@ func runSingle(args *Args, client *twitter.Client) error {
 
 	// Wait for user to confirm
 	if !args.NoPrompt && !args.Daemon {
-		fmt.Printf("\nDelete %d tweets that match the above? [y/n] ", len(tweets))
+		fmt.Printf("\nDelete %d tweets that match the above? [y/n] ", numTweets)
 
 		var input string
 		fmt.Scanf("%s", &input)
@@ -106,7 +117,7 @@ func runSingle(args *Args, client *twitter.Client) error {
 		}
 	}
 
-	err = histweet.DeleteTweets(tweets, client)
+	err = histweet.DeleteTweets(tweetIds, client)
 	if err != nil {
 		return err
 	}
@@ -200,6 +211,7 @@ func handleCli(c *cli.Context) error {
 	maxReplies := c.Int("max-replies")
 	maxRetweets := c.Int("max-retweets")
 	count := c.Int("count")
+	archive := c.String("archive")
 	invert := c.Bool("invert")
 	any := c.Bool("any")
 	noPrompt := c.Bool("no-prompt")
@@ -304,6 +316,7 @@ func handleCli(c *cli.Context) error {
 		Daemon:         daemon,
 		Interval:       interval,
 		NoPrompt:       noPrompt,
+		Archive:        archive,
 		ConsumerKey:    consumerKey,
 		ConsumerSecret: consumerSecret,
 		AccessToken:    accessToken,

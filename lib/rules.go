@@ -141,3 +141,50 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 
 	return false, nil
 }
+
+// Returns `true` if the given archive tweet matches this rule
+func (rule *Rule) IsArchiveMatch(tweet *archiveTweet) (bool, error) {
+	// TODO: Refactor?
+	var err error
+	var createdAt time.Time
+
+	m := NewMatch(rule)
+
+	createdAt, err = time.Parse(ARCHIVE_TIME_LAYOUT, tweet.CreatedAt)
+	if err != nil {
+		return false, errors.New(fmt.Sprintf("Could not determine creation time of tweet: %d", tweet.Id))
+	}
+
+	// Check if we have a match in tweet-based rules
+	if rule.Tweet != nil {
+		tweetRule := rule.Tweet
+
+		if !tweetRule.Before.IsZero() {
+			m.before = createdAt.Before(tweetRule.Before)
+		}
+
+		if !tweetRule.After.IsZero() {
+			m.after = createdAt.After(tweetRule.After)
+		}
+
+		if tweetRule.Contains != "" {
+			m.contains = strings.Contains(tweet.FullText, tweetRule.Contains)
+		}
+
+		if tweetRule.Match != nil {
+			m.match = (tweetRule.Match.FindStringIndex(tweet.FullText) != nil)
+		}
+
+		if tweetRule.MaxLikes > 0 {
+			m.maxLikes = (tweet.FavoriteCount < tweetRule.MaxLikes)
+		}
+
+		if tweetRule.MaxRetweets > 0 {
+			m.maxRetweets = (tweet.RetweetCount < tweetRule.MaxRetweets)
+		}
+
+		return m.Eval(rule), nil
+	}
+
+	return false, nil
+}
