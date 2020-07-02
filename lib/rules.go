@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/dghubble/go-twitter/twitter"
@@ -20,7 +21,8 @@ type RuleCount struct {
 type RuleTweet struct {
 	Before      time.Time
 	After       time.Time
-	Contains    *regexp.Regexp
+	Match       *regexp.Regexp
+	Contains    string
 	MaxLikes    int
 	MaxReplies  int
 	MaxRetweets int
@@ -61,9 +63,13 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 			match = match && createdAt.After(tweetRule.After)
 		}
 
-		// Check if we have a contains match
-		if tweetRule.Contains != nil {
-			res := tweetRule.Contains.FindStringIndex(tweet.Text)
+		if tweetRule.Contains != "" {
+			res := strings.Contains(tweet.Text, tweetRule.Contains)
+			match = match && res
+		}
+
+		if tweetRule.Match != nil {
+			res := tweetRule.Match.FindStringIndex(tweet.Text)
 			match = match && (res != nil)
 		}
 

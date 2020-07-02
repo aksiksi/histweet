@@ -3,85 +3,42 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/urfave/cli/v2"
 )
 
 func buildCliApp() *cli.App {
 	// Define CLI flags
-	flags := []cli.Flag{
-		&cli.StringFlag{
-			Name:     "consumer-key",
-			Usage:    "Twitter API consumer `KEY`",
-			EnvVars:  []string{"HISTWEET_CONSUMER_KEY"},
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "consumer-secret",
-			Usage:    "Twitter API consumer secret `KEY`",
-			EnvVars:  []string{"HISTWEET_CONSUMER_SECRET"},
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "access-token",
-			Usage:    "Twitter API access `TOKEN`",
-			EnvVars:  []string{"HISTWEET_ACCESS_TOKEN"},
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:     "access-secret",
-			Usage:    "Twitter API access secret `TOKEN`",
-			EnvVars:  []string{"HISTWEET_ACCESS_SECRET"},
-			Required: true,
-		},
-		&cli.TimestampFlag{
-			Name:        "before",
-			Aliases:     []string{"b"},
-			Usage:       "Delete all tweets before this `DATE` (ex: 2020-May-10)",
-			Layout:      "2006-Jan-02",
-			DefaultText: "ignored",
-		},
-		&cli.TimestampFlag{
-			Name:        "after",
-			Aliases:     []string{"a"},
-			Usage:       "Delete all tweets after this `DATE` (ex: 2020-May-10)",
-			Layout:      "2006-Jan-02",
-			DefaultText: "ignored",
-		},
-		&cli.StringFlag{
-			Name:  "age",
-			Usage: "Delete all tweets older than this `AGE` (ex: 10d, 1m, 1y, 1d6m, 1d3m1y)",
-		},
-		&cli.StringFlag{
-			Name:        "contains",
-			Aliases:     []string{"c"},
-			Usage:       "Delete all tweets that match this `REGEX`",
-			DefaultText: "ignored",
-		},
-		&cli.IntFlag{
-			Name:    "max-likes",
-			Aliases: []string{"l"},
-			Usage:   "Only tweets with fewer than `N` likes will be deleted",
-		},
-		&cli.IntFlag{
-			Name:    "max-replies",
-			Aliases: []string{"r"},
-			Usage:   "Only tweets with fewer than `N` replies will be deleted",
-		},
-		&cli.IntFlag{
-			Name:    "max-retweets",
-			Aliases: []string{"t"},
-			Usage:   "Only tweets with fewer than `N` retweets will be deleted",
-		},
+	countFlags := []cli.Flag{
 		&cli.IntFlag{
 			Name:    "count",
 			Aliases: []string{"n"},
 			Usage:   "Only keep the `N` most recent tweets (all other rules are ignored!)",
 		},
-		&cli.BoolFlag{
-			Name:  "invert",
-			Value: false,
-			Usage: "Delete tweets that do _not_ match the specified rules",
+		&cli.StringFlag{
+			Name:     "consumer-key",
+			Usage:    "Twitter API consumer `key`",
+			EnvVars:  []string{"HISTWEET_CONSUMER_KEY"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "consumer-secret",
+			Usage:    "Twitter API consumer secret `key`",
+			EnvVars:  []string{"HISTWEET_CONSUMER_SECRET"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "access-token",
+			Usage:    "Twitter API access `token`",
+			EnvVars:  []string{"HISTWEET_ACCESS_TOKEN"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "access-secret",
+			Usage:    "Twitter API access secret `token`",
+			EnvVars:  []string{"HISTWEET_ACCESS_SECRET"},
+			Required: true,
 		},
 		&cli.BoolFlag{
 			Name:  "no-prompt",
@@ -98,17 +55,130 @@ func buildCliApp() *cli.App {
 			Name:    "interval",
 			Aliases: []string{"i"},
 			Value:   MIN_DAEMON_INTERVAL,
-			Usage:   "Interval at which to check for tweets, in `SECONDS`",
+			Usage:   "Interval at which to check for tweets, in `seconds`",
+		},
+	}
+
+	tweetFlags := []cli.Flag{
+		&cli.StringFlag{
+			Name:    "age",
+			Aliases: []string{"a"},
+			Usage:   "Delete all tweets older than given `age` (ex: 10d, 1m, 1y, 6m1d, 1y3m1d)",
+		},
+		&cli.StringFlag{
+			Name:        "contains",
+			Aliases:     []string{"c"},
+			Usage:       "Delete all tweets that contain the given `string`",
+			DefaultText: "ignored",
+		},
+		&cli.StringFlag{
+			Name:        "match",
+			Aliases:     []string{"m"},
+			Usage:       "Delete all tweets that match given `regex`",
+			DefaultText: "ignored",
+		},
+		&cli.TimestampFlag{
+			Name:        "before",
+			Aliases:     []string{"b"},
+			Usage:       "Delete all tweets before given `date` (ex: 2020-May-10)",
+			Layout:      "2006-Jan-02",
+			DefaultText: "ignored",
+		},
+		&cli.TimestampFlag{
+			Name:        "after",
+			Aliases:     []string{"f"},
+			Usage:       "Delete all tweets after given `date` (ex: 2020-May-10)",
+			Layout:      "2006-Jan-02",
+			DefaultText: "ignored",
+		},
+		&cli.IntFlag{
+			Name:    "max-likes",
+			Aliases: []string{"l"},
+			Usage:   "Delete all tweets with fewer than `N` likes",
+		},
+		&cli.IntFlag{
+			Name:    "max-replies",
+			Aliases: []string{"r"},
+			Usage:   "Delete all tweets with fewer than `N` replies",
+		},
+		&cli.IntFlag{
+			Name:    "max-retweets",
+			Aliases: []string{"t"},
+			Usage:   "Delete all tweets with fewer than `N` retweets",
+		},
+		&cli.BoolFlag{
+			Name:  "invert",
+			Value: false,
+			Usage: "Delete tweets that do _not_ match the specified rules",
+		},
+		&cli.StringFlag{
+			Name:     "consumer-key",
+			Usage:    "Twitter API consumer `key`",
+			EnvVars:  []string{"HISTWEET_CONSUMER_KEY"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "consumer-secret",
+			Usage:    "Twitter API consumer secret `key`",
+			EnvVars:  []string{"HISTWEET_CONSUMER_SECRET"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "access-token",
+			Usage:    "Twitter API access `token`",
+			EnvVars:  []string{"HISTWEET_ACCESS_TOKEN"},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "access-secret",
+			Usage:    "Twitter API access secret `token`",
+			EnvVars:  []string{"HISTWEET_ACCESS_SECRET"},
+			Required: true,
+		},
+		&cli.BoolFlag{
+			Name:  "no-prompt",
+			Value: false,
+			Usage: "Do not prompt user to confirm deletion - ignored in daemon mode",
+		},
+		&cli.BoolFlag{
+			Name:    "daemon",
+			Aliases: []string{"d"},
+			Value:   false,
+			Usage:   "Run the CLI in daemon mode",
+		},
+		&cli.IntFlag{
+			Name:    "interval",
+			Aliases: []string{"i"},
+			Value:   MIN_DAEMON_INTERVAL,
+			Usage:   "Interval at which to check for tweets, in `seconds`",
 		},
 	}
 
 	// Define the histweet CLI
 	app := &cli.App{
-		Name:  "histweet",
+		Name:     "histweet",
+		Compiled: time.Now(),
+		Authors: []*cli.Author{
+			&cli.Author{
+				Name: "Assil Ksiksi",
+			},
+		},
 		Usage: "Manage your tweets via an intuitive CLI",
-		Flags: flags,
-		Action: func(c *cli.Context) error {
-			return handleCli(c)
+		Commands: []*cli.Command{
+			{
+				Name:    "count",
+				Flags:   countFlags,
+				Usage:   "Simply delete all but the N latest tweets",
+				Aliases: []string{"c"},
+				Action:  handleCli,
+			},
+			{
+				Name:    "rules",
+				Flags:   tweetFlags,
+				Usage:   "Delete all tweets that match one or more rules",
+				Aliases: []string{"r"},
+				Action:  handleCli,
+			},
 		},
 	}
 

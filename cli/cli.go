@@ -42,7 +42,7 @@ func ConvertAgeToTime(age string) (time.Time, error) {
 	var months int
 	var years int
 
-	agePat := regexp.MustCompile(`(\d+d)?(\d+m)?(\d+y)?`)
+	agePat := regexp.MustCompile(`(\d+y)?(\d+m)?(\d+d)?`)
 
 	matches := agePat.FindStringSubmatch(age)
 	if matches == nil {
@@ -160,8 +160,12 @@ func Run(args *Args) error {
 			fmt.Printf("  * Rule: delete all tweets after %s\n", after)
 		}
 
-		if args.Rule.Tweet.Contains != nil {
+		if args.Rule.Tweet.Contains != "" {
 			fmt.Printf("  * Rule: delete all tweets that contain \"%s\"\n", args.Rule.Tweet.Contains)
+		}
+
+		if args.Rule.Tweet.Match != nil {
+			fmt.Printf("  * Rule: delete all tweets that match regex \"%s\"\n", args.Rule.Tweet.Match)
 		}
 	}
 
@@ -191,6 +195,7 @@ func handleCli(c *cli.Context) error {
 	after := c.Timestamp("after")
 	age := c.String("age")
 	contains := c.String("contains")
+	match := c.String("match")
 	maxLikes := c.Int("max-likes")
 	maxReplies := c.Int("max-replies")
 	maxRetweets := c.Int("max-retweets")
@@ -201,6 +206,11 @@ func handleCli(c *cli.Context) error {
 	interval := c.Int("interval")
 
 	isRuleProvided := false
+
+	if !c.IsSet("consumer-key") || !c.IsSet("consumer-secret") ||
+		!c.IsSet("access-token") || !c.IsSet("access-secret") {
+		return cli.Exit("All Twitter API keys are required", 1)
+	}
 
 	// Twitter API info
 	consumerKey := c.String("consumer-key")
@@ -219,7 +229,7 @@ func handleCli(c *cli.Context) error {
 		}
 
 		isRuleProvided = true
-	} else if c.IsSet("before") || c.IsSet("after") || c.IsSet("age") || c.IsSet("contains") {
+	} else if c.IsSet("before") || c.IsSet("after") || c.IsSet("age") || c.IsSet("match") || c.IsSet("contains") {
 		// Tweet-based rule
 		ruleTweet = &histweet.RuleTweet{}
 
@@ -245,14 +255,18 @@ func handleCli(c *cli.Context) error {
 			}
 		}
 
-		// If we have a contains rule, build it
-		if c.IsSet("contains") {
-			pattern, err := regexp.Compile(contains)
+		// If we have a match rule, build it
+		if c.IsSet("match") {
+			pattern, err := regexp.Compile(match)
 			if err != nil {
-				return cli.Exit("Invalid regex pattern passed into \"contains\"", 1)
+				return cli.Exit("Invalid regex pattern passed into \"match\"", 1)
 			}
 
-			ruleTweet.Contains = pattern
+			ruleTweet.Match = pattern
+		}
+
+		if c.IsSet("contains") {
+			ruleTweet.Contains = contains
 		}
 
 		// Check for other tweet-based rules

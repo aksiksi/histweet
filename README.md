@@ -1,37 +1,50 @@
 # Histweet
 
+`histweet` is a simple CLI tool that automatically manages your Twitter timeline.
+
+By default, due to limits in the Twitter API, `histweet` can only process that latest 3,200 tweets in your timeline. However, if you point `histweet` to an optional tweet archive, the tool can process tweets based on your entire history.
+
+## Prerequisites
+
+Before you can use `histweet`, you must first obtain a Twitter API key and access token. To do this, signup for a Twitter Developer account [here](https://developer.twitter.com/en/apply-for-access).
+
+Once you have your keys, you can either pass them in as CLI flags or define the following environment variables:
+
+```
+$ export HISTWEET_ACCESS_TOKEN=[YOUR_KEY]
+$ export HISTWEET_ACCESS_SECRET=[YOUR_KEY]
+$ export HISTWEET_CONSUMER_KEY=[YOUR_KEY]
+$ export HISTWEET_CONSUMER_SECRET=[YOUR_KEY]
+```
+
+## Quickstart
+
+`histweet` comes with two basic modes: count mode and rules mode.
+
+### Count Mode
+
+In count mode, `histweet` just keeps the latest `N` tweets.  For example, we can keep the latest 300 tweets and delete everything else like so (`--daemon` keeps `histweet` running in the background).
+
+```
+histweet count -n 300 --daemon
+```
+
+### Rules Mode
+
+Rules mode is the more powerful and... practical mode.  In this mode, you can specify one or more *rules*. `histweet` will delete **all** tweets that match **all** of the provided rules.
+
+In this example, we delete all tweets that are:
+
+1. Older than 3 months and 5 days, and;
+2. Have fewer than 3 likes, and;
+3. Contain the word "dt" (as a regex pattern)
+
+```
+./histweet rules --age 3m5d --max-likes 3 --match '\sdt(\s|\.|$)'
+```
+
+You can view full usage by passing in the `-h` flag.
+
 ## Build
 
 `cd cli && go build -o histweet`
-
-## Usage
-
-```
-NAME:
-   histweet - Manage your tweets via an intuitive CLI
-
-USAGE:
-   histweet [global options] command [command options] [arguments...]
-
-COMMANDS:
-   help, h  Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --consumer-key value     Twitter API consumer key [$HISTWEET_CONSUMER_KEY]
-   --consumer-secret value  Twitter API consumer secret key [$HISTWEET_CONSUMER_SECRET]
-   --access-token value     Twitter API access token [$HISTWEET_ACCESS_TOKEN]
-   --access-secret value    Twitter API access secret [$HISTWEET_ACCESS_SECRET]
-   --before value           Delete all tweets before this time (ex: 2020-May-10) (default: ignored)
-   --after value            Delete all tweets after this time (ex: 2020-May-10) (default: ignored)
-   --age value              Delete all tweets older than this age (ex: 10d, 1m, 1y, 1d6m, 1d3m1y)
-   --contains value         Delete all tweets that match a regex pattern (default: ignored)
-   --max-likes value        Only tweets with fewer likes will be deleted (default: 0)
-   --max-replies value      Only tweets with fewer replies will be deleted (default: 0)
-   --max-retweets value     Only tweets with fewer retweets will be deleted (default: 0)
-   --count value            Only keep the "count" most recent tweets (all other rules are ignored!) (default: 0)
-   --invert                 Delete tweets that do _not_ match the specified rules (default: false)
-   --no-prompt              Do not prompt user to confirm deletion - ignored in daemon mode (default: false)
-   --daemon                 Run the CLI in daemon mode (default: false)
-   --interval value         Interval at which to check for tweets, in seconds (default: 30)
-   --help, -h               show help (default: false)
-```
