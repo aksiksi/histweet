@@ -29,8 +29,6 @@ type RuleTweet struct {
 }
 
 // Rule for what kind of tweets to delete
-// One or more rules can be defined to narrow down the conditions for tweet
-// deletion. However, options within each rule are mutually exclusive.
 type Rule struct {
 	// Delete tweets based on an account-level count
 	Count *RuleCount
@@ -40,11 +38,66 @@ type Rule struct {
 
 	// If true, delete tweets that do _not_ match the specified rules
 	Invert bool
+
+	// If true, delete tweets that match _any_ of the specified rules
+	Any bool
+}
+
+type Match struct {
+	before      bool
+	after       bool
+	contains    bool
+	match       bool
+	maxLikes    bool
+	maxRetweets bool
+	maxReplies  bool
+}
+
+func (m *Match) Eval(rule *Rule) bool {
+	var res bool
+
+	if rule.Any {
+		res = m.before || m.after || m.contains || m.match || m.maxLikes || m.maxRetweets || m.maxReplies
+	} else {
+		res = m.before && m.after && m.contains && m.match && m.maxLikes && m.maxRetweets && m.maxReplies
+	}
+
+	if rule.Invert {
+		return !res
+	} else {
+		return res
+	}
+}
+
+// Build a new Match struct
+// If `any` is true, init all fields to false
+func NewMatch(rule *Rule) *Match {
+	if rule.Any {
+		return &Match{
+			before:      false,
+			after:       false,
+			contains:    false,
+			match:       false,
+			maxLikes:    false,
+			maxRetweets: false,
+			maxReplies:  false,
+		}
+	} else {
+		return &Match{
+			before:      true,
+			after:       true,
+			contains:    true,
+			match:       true,
+			maxLikes:    true,
+			maxRetweets: true,
+			maxReplies:  true,
+		}
+	}
 }
 
 // Returns `true` if the given tweet matches this rule
 func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
-	match := true
+	m := NewMatch(rule)
 
 	createdAt, err := tweet.CreatedAtTime()
 	if err != nil {
@@ -56,39 +109,35 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 		tweetRule := rule.Tweet
 
 		if !tweetRule.Before.IsZero() {
-			match = match && createdAt.Before(tweetRule.Before)
+			m.before = createdAt.Before(tweetRule.Before)
 		}
 
 		if !tweetRule.After.IsZero() {
-			match = match && createdAt.After(tweetRule.After)
+			m.after = createdAt.After(tweetRule.After)
 		}
 
 		if tweetRule.Contains != "" {
-			res := strings.Contains(tweet.Text, tweetRule.Contains)
-			match = match && res
+			m.contains = strings.Contains(tweet.Text, tweetRule.Contains)
 		}
 
 		if tweetRule.Match != nil {
-			res := tweetRule.Match.FindStringIndex(tweet.Text)
-			match = match && (res != nil)
+			m.match = (tweetRule.Match.FindStringIndex(tweet.Text) != nil)
 		}
 
 		if tweetRule.MaxLikes > 0 {
-			match = match && (tweet.FavoriteCount < tweetRule.MaxLikes)
+			m.maxLikes = (tweet.FavoriteCount < tweetRule.MaxLikes)
 		}
 
 		if tweetRule.MaxRetweets > 0 {
-			match = match && (tweet.RetweetCount < tweetRule.MaxRetweets)
+			m.maxRetweets = (tweet.RetweetCount < tweetRule.MaxRetweets)
 		}
 
 		if tweetRule.MaxReplies > 0 {
-			match = match && (tweet.ReplyCount < tweetRule.MaxReplies)
+			m.maxReplies = (tweet.ReplyCount < tweetRule.MaxReplies)
 		}
+
+		return m.Eval(rule), nil
 	}
 
-	if rule.Invert {
-		match = !match
-	}
-
-	return match, nil
+	return false, nil
 }

@@ -201,6 +201,7 @@ func handleCli(c *cli.Context) error {
 	maxRetweets := c.Int("max-retweets")
 	count := c.Int("count")
 	invert := c.Bool("invert")
+	any := c.Bool("any")
 	noPrompt := c.Bool("no-prompt")
 	daemon := c.Bool("daemon")
 	interval := c.Int("interval")
@@ -295,6 +296,7 @@ func handleCli(c *cli.Context) error {
 		Tweet:  ruleTweet,
 		Count:  ruleCount,
 		Invert: invert,
+		Any:    any,
 	}
 
 	// Build the args struct to run the command

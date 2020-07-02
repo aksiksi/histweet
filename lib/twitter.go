@@ -110,8 +110,8 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]twitter.Tweet, e
 }
 
 func DeleteTweets(tweets []twitter.Tweet, client *twitter.Client) error {
-	for i := 0; i < len(tweets); i++ {
-		_, _, err := client.Statuses.Destroy(tweets[i].ID, &twitter.StatusDestroyParams{})
+	for _, tweet := range tweets {
+		_, _, err := client.Statuses.Destroy(tweet.ID, &twitter.StatusDestroyParams{})
 		if err != nil {
 			return err
 		}

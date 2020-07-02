@@ -2,7 +2,7 @@
 
 `histweet` is a simple CLI tool that automatically manages your Twitter timeline.
 
-By default, due to limits in the Twitter API, `histweet` can only process that latest 3,200 tweets in your timeline. However, if you point `histweet` to an optional tweet archive, the tool can process tweets based on your entire history.
+By default, due to limits in the Twitter API, `histweet` can only process that latest 3,200 tweets in your timeline. However, if you point `histweet` to an optional [Twitter archive](https://help.twitter.com/en/managing-your-account/how-to-download-your-twitter-archive), the tool can process tweets based on your entire history.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ histweet count -n 300 --daemon
 
 ### Rules Mode
 
-Rules mode is the more powerful and... practical mode.  In this mode, you can specify one or more *rules*. `histweet` will delete **all** tweets that match **all** of the provided rules.
+Rules mode is the more powerful and... practical mode.  In this mode, you can specify one or more *rules*. `histweet` will delete **all** tweets that match **all** of the provided rules. You can pass in the `--any` flag to instead delete tweets that match **any** of the provided rules.
 
 In this example, we delete all tweets that are:
 

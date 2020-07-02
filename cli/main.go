@@ -111,6 +111,11 @@ func buildCliApp() *cli.App {
 			Value: false,
 			Usage: "Delete tweets that do _not_ match the specified rules",
 		},
+		&cli.BoolFlag{
+			Name:  "any",
+			Value: false,
+			Usage: "Delete tweets that match _any_ of the rules",
+		},
 		&cli.StringFlag{
 			Name:     "consumer-key",
 			Usage:    "Twitter API consumer `key`",
