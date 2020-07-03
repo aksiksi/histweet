@@ -10,6 +10,7 @@ import (
 
 const (
 	ARCHIVE_TIME_LAYOUT = "Mon Jan 02 15:04:05 -0700 2006"
+	ARCHIVE_SKIP_HEADER = "window.YTD.tweet.part0 = "
 )
 
 // Relevant fields for a tweet in archive JSON format
@@ -64,16 +65,15 @@ func FetchArchiveTweets(rule *Rule, archive string) ([]int64, error) {
 
 	fileSize := info.Size()
 
-	// Skip first 25 characters to get to valid JSON
-	// Note: archive file starts with this line:
-	// 	  window.YTD.tweet.part0 = [ {
-	_, err = f.Seek(25, 0)
+	// Skip some characters to get to valid JSON
+	numSkip := int64(len(ARCHIVE_SKIP_HEADER))
+	_, err = f.Seek(numSkip, 0)
 	if err != nil {
 		return nil, err
 	}
 
 	// Allocate buffer of exact size to hold JSON
-	buf := make([]byte, fileSize-25)
+	buf := make([]byte, fileSize-numSkip)
 	_, err = f.Read(buf)
 	if err != nil {
 		return nil, err
