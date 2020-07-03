@@ -1,13 +1,9 @@
 package histweet
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/dghubble/go-twitter/twitter"
 )
 
 // Keep the N latest tweets
@@ -96,13 +92,11 @@ func NewMatch(rule *Rule) *Match {
 }
 
 // Returns `true` if the given tweet matches this rule
-func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
+func (rule *Rule) IsMatch(tweet *Tweet) (bool, error) {
 	m := NewMatch(rule)
 
-	createdAt, err := tweet.CreatedAtTime()
-	if err != nil {
-		return false, errors.New(fmt.Sprintf("Could not determine creation time of tweet: %d", tweet.ID))
-	}
+	createdAt := tweet.CreatedAt
+	text := tweet.Text
 
 	// Check if we have a match in tweet-based rules
 	if rule.Tweet != nil {
@@ -117,70 +111,23 @@ func (rule *Rule) IsMatch(tweet *twitter.Tweet) (bool, error) {
 		}
 
 		if tweetRule.Contains != "" {
-			m.contains = strings.Contains(tweet.Text, tweetRule.Contains)
+			m.contains = strings.Contains(text, tweetRule.Contains)
 		}
 
 		if tweetRule.Match != nil {
-			m.match = (tweetRule.Match.FindStringIndex(tweet.Text) != nil)
+			m.match = (tweetRule.Match.FindStringIndex(text) != nil)
 		}
 
 		if tweetRule.MaxLikes > 0 {
-			m.maxLikes = (tweet.FavoriteCount < tweetRule.MaxLikes)
+			m.maxLikes = (tweet.NumLikes < tweetRule.MaxLikes)
 		}
 
 		if tweetRule.MaxRetweets > 0 {
-			m.maxRetweets = (tweet.RetweetCount < tweetRule.MaxRetweets)
+			m.maxRetweets = (tweet.NumRetweets < tweetRule.MaxRetweets)
 		}
 
 		if tweetRule.MaxReplies > 0 {
-			m.maxReplies = (tweet.ReplyCount < tweetRule.MaxReplies)
-		}
-
-		return m.Eval(rule), nil
-	}
-
-	return false, nil
-}
-
-// Returns `true` if the given archive tweet matches this rule
-func (rule *Rule) IsArchiveMatch(tweet *archiveTweet) (bool, error) {
-	// TODO: Refactor?
-	var err error
-	var createdAt time.Time
-
-	m := NewMatch(rule)
-
-	createdAt, err = time.Parse(ARCHIVE_TIME_LAYOUT, tweet.CreatedAt)
-	if err != nil {
-		return false, errors.New(fmt.Sprintf("Could not determine creation time of tweet: %d", tweet.Id))
-	}
-
-	// Check if we have a match in tweet-based rules
-	if rule.Tweet != nil {
-		tweetRule := rule.Tweet
-
-		if !tweetRule.Before.IsZero() {
-			m.before = createdAt.Before(tweetRule.Before)
-		}
-
-		if !tweetRule.After.IsZero() {
-			m.after = createdAt.After(tweetRule.After)
-		}
-
-		if tweetRule.Contains != "" {
-			m.contains = strings.Contains(tweet.FullText, tweetRule.Contains)
-		}
-
-		if tweetRule.Match != nil {
-			m.match = (tweetRule.Match.FindStringIndex(tweet.FullText) != nil)
-		}
-
-		if tweetRule.MaxLikes > 0 {
-			m.maxLikes = (tweet.FavoriteCount < tweetRule.MaxLikes)
-		}
-
-		if tweetRule.MaxRetweets > 0 {
-			m.maxRetweets = (tweet.RetweetCount < tweetRule.MaxRetweets)
+			m.maxReplies = (tweet.NumReplies < tweetRule.MaxReplies)
 		}
 
 		return m.Eval(rule), nil

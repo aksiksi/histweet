@@ -3,6 +3,7 @@ package histweet
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
@@ -11,6 +12,31 @@ import (
 const (
 	MAX_TIMELINE_TWEETS = 3200
 )
+
+type Tweet struct {
+	Id          int64
+	CreatedAt   time.Time
+	Text        string
+	NumLikes    int
+	NumRetweets int
+	NumReplies  int
+}
+
+// Convert an API tweet to internal tweet struct
+func convertApiTweet(from *twitter.Tweet) *Tweet {
+	createdAt, _ := from.CreatedAtTime()
+
+	tweet := &Tweet{
+		Id:          from.ID,
+		CreatedAt:   createdAt,
+		Text:        from.Text,
+		NumLikes:    from.FavoriteCount,
+		NumRetweets: from.RetweetCount,
+		NumReplies:  from.ReplyCount,
+	}
+
+	return tweet
+}
 
 func NewTwitterClient(
 	consumerKey string,
@@ -86,7 +112,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]int64, error) {
 			// Figure out if any of these tweets match the given rules
 			for i := 0; i < len(returnedTweets); i++ {
 				tweet := returnedTweets[i]
-				match, _ := rule.IsMatch(&tweet)
+				match, _ := rule.IsMatch(convertApiTweet(&tweet))
 
 				if match {
 					tweets = append(tweets, tweet)

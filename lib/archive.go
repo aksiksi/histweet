@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 const (
@@ -14,17 +15,33 @@ const (
 // Relevant fields for a tweet in archive JSON format
 type archiveTweet struct {
 	IdStr            string `json:"id"`
-	Id               int64
 	CreatedAt        string `json:"created_at"`
 	FullText         string `json:"full_text"`
 	FavoriteCountStr string `json:"favorite_count"`
-	FavoriteCount    int
 	RetweetCountStr  string `json:"retweet_count"`
-	RetweetCount     int
 }
 
 type archiveEntry struct {
 	Tweet archiveTweet `json:"tweet"`
+}
+
+// Convert an archive tweet to internal tweet struct
+func convertArchiveTweet(from *archiveTweet) *Tweet {
+	tweetId, _ := strconv.ParseInt(from.IdStr, 10, 64)
+	createdAt, _ := time.Parse(ARCHIVE_TIME_LAYOUT, from.CreatedAt)
+	favoriteCount, _ := strconv.Atoi(from.FavoriteCountStr)
+	retweetCount, _ := strconv.Atoi(from.RetweetCountStr)
+
+	tweet := &Tweet{
+		Id:          tweetId,
+		CreatedAt:   createdAt,
+		Text:        from.FullText,
+		NumLikes:    favoriteCount,
+		NumRetweets: retweetCount,
+		NumReplies:  -1,
+	}
+
+	return tweet
 }
 
 // Fetch tweets from provided Twitter archive
@@ -32,8 +49,6 @@ func FetchArchiveTweets(rule *Rule, archive string) ([]int64, error) {
 	var err error
 	var f *os.File
 	var info os.FileInfo
-	var tweetId int64
-	var favoriteCount, retweetCount int
 	var res bool
 
 	f, err = os.Open(archive)
@@ -77,24 +92,17 @@ func FetchArchiveTweets(rule *Rule, archive string) ([]int64, error) {
 	tweetIds := make([]int64, 0, len(tweets))
 
 	for _, entry := range tweets {
-		tweet := &entry.Tweet
+		// Convert tweet
+		old := &entry.Tweet
+		tweet := convertArchiveTweet(old)
 
-		tweetId, _ = strconv.ParseInt(tweet.IdStr, 10, 64)
-		tweet.Id = tweetId
-
-		favoriteCount, _ = strconv.Atoi(tweet.FavoriteCountStr)
-		tweet.FavoriteCount = favoriteCount
-
-		retweetCount, _ = strconv.Atoi(tweet.RetweetCountStr)
-		tweet.RetweetCount = retweetCount
-
-		res, err = rule.IsArchiveMatch(tweet)
+		res, err = rule.IsMatch(tweet)
 		if err != nil {
 			return nil, err
 		}
 
 		if res {
-			tweetIds = append(tweetIds, tweetId)
+			tweetIds = append(tweetIds, tweet.Id)
 		}
 	}
 
