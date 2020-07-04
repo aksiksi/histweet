@@ -20,6 +20,8 @@ type Tweet struct {
 	NumLikes    int
 	NumRetweets int
 	NumReplies  int
+	IsRetweet   bool
+	IsReply     bool
 }
 
 // Convert an API tweet to internal tweet struct
@@ -32,7 +34,8 @@ func convertApiTweet(from *twitter.Tweet) *Tweet {
 		Text:        from.Text,
 		NumLikes:    from.FavoriteCount,
 		NumRetweets: from.RetweetCount,
-		NumReplies:  from.ReplyCount,
+		IsRetweet:   from.RetweetedStatus != nil,
+		IsReply:     from.InReplyToStatusID != 0,
 	}
 
 	return tweet

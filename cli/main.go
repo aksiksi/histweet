@@ -97,11 +97,6 @@ func buildCliApp() *cli.App {
 			Usage:   "Delete all tweets with fewer than `N` likes",
 		},
 		&cli.IntFlag{
-			Name:    "max-replies",
-			Aliases: []string{"r"},
-			Usage:   "Delete all tweets with fewer than `N` replies",
-		},
-		&cli.IntFlag{
 			Name:    "max-retweets",
 			Aliases: []string{"t"},
 			Usage:   "Delete all tweets with fewer than `N` retweets",

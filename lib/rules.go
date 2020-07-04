@@ -20,7 +20,6 @@ type RuleTweet struct {
 	Match       *regexp.Regexp
 	Contains    string
 	MaxLikes    int
-	MaxReplies  int
 	MaxRetweets int
 }
 
@@ -46,16 +45,15 @@ type Match struct {
 	match       bool
 	maxLikes    bool
 	maxRetweets bool
-	maxReplies  bool
 }
 
 func (m *Match) Eval(rule *Rule) bool {
 	var res bool
 
 	if rule.Any {
-		res = m.before || m.after || m.contains || m.match || m.maxLikes || m.maxRetweets || m.maxReplies
+		res = m.before || m.after || m.contains || m.match || m.maxLikes || m.maxRetweets
 	} else {
-		res = m.before && m.after && m.contains && m.match && m.maxLikes && m.maxRetweets && m.maxReplies
+		res = m.before && m.after && m.contains && m.match && m.maxLikes && m.maxRetweets
 	}
 
 	if rule.Invert {
@@ -76,7 +74,6 @@ func NewMatch(rule *Rule) *Match {
 			match:       false,
 			maxLikes:    false,
 			maxRetweets: false,
-			maxReplies:  false,
 		}
 	} else {
 		return &Match{
@@ -86,7 +83,6 @@ func NewMatch(rule *Rule) *Match {
 			match:       true,
 			maxLikes:    true,
 			maxRetweets: true,
-			maxReplies:  true,
 		}
 	}
 }
@@ -124,10 +120,6 @@ func (rule *Rule) IsMatch(tweet *Tweet) (bool, error) {
 
 		if tweetRule.MaxRetweets > 0 {
 			m.maxRetweets = (tweet.NumRetweets < tweetRule.MaxRetweets)
-		}
-
-		if tweetRule.MaxReplies > 0 {
-			m.maxReplies = (tweet.NumReplies < tweetRule.MaxReplies)
 		}
 
 		return m.Eval(rule), nil

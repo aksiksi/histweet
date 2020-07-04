@@ -208,7 +208,6 @@ func handleCli(c *cli.Context) error {
 	contains := c.String("contains")
 	match := c.String("match")
 	maxLikes := c.Int("max-likes")
-	maxReplies := c.Int("max-replies")
 	maxRetweets := c.Int("max-retweets")
 	count := c.Int("count")
 	archive := c.String("archive")
@@ -285,10 +284,6 @@ func handleCli(c *cli.Context) error {
 		// Check for other tweet-based rules
 		if c.IsSet("max-likes") {
 			ruleTweet.MaxLikes = maxLikes
-		}
-
-		if c.IsSet("max-replies") {
-			ruleTweet.MaxReplies = maxReplies
 		}
 
 		if c.IsSet("max-retweets") {

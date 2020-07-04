@@ -39,7 +39,8 @@ func convertArchiveTweet(from *archiveTweet) *Tweet {
 		Text:        from.FullText,
 		NumLikes:    favoriteCount,
 		NumRetweets: retweetCount,
-		NumReplies:  -1,
+		IsRetweet:   from.FullText[:3] == "RT",
+		IsReply:     from.FullText[:1] == "@",
 	}
 
 	return tweet
