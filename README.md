@@ -1,5 +1,8 @@
 # Histweet
 
+![Go](https://github.com/aksiksi/histweet/workflows/Go/badge.svg)
+[![codecov](https://codecov.io/gh/aksiksi/histweet/branch/master/graph/badge.svg)](https://codecov.io/gh/aksiksi/histweet)
+
 `histweet` is a simple CLI tool that automatically manages your Twitter timeline.
 
 By default, due to limits in the Twitter API, `histweet` can only process that latest 3,200 tweets in your timeline. However, if you point `histweet` to an optional [Twitter archive](https://help.twitter.com/en/managing-your-account/how-to-download-your-twitter-archive), the tool can process tweets based on your entire history.
