@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -191,10 +192,23 @@ func buildCliApp() *cli.App {
 }
 
 func main() {
-	app := buildCliApp()
-
-	err := app.Run(os.Args)
+	input, err := ioutil.ReadFile("/tmp/input")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		os.Exit(1)
 	}
+
+	parser := NewParser(string(input))
+
+	err1 := parser.Parse()
+	if err1 != nil {
+		log.Fatal(err1)
+	}
+
+	// app := buildCliApp()
+
+	// err := app.Run(os.Args)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 }
