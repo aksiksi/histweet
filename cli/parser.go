@@ -40,7 +40,15 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/aksiksi/histweet/lib"
+)
+
+const (
+	TIME_LAYOUT = "02-Jan-2006"
 )
 
 type Token struct {
@@ -52,21 +60,20 @@ type Token struct {
 
 // Internal lexer state
 type Lexer struct {
-	patterns       map[string]*regexp.Regexp
-	input          string
-	pos            int
-	numTokens      int
-	skipWhitespace bool
+	patterns  map[string]*regexp.Regexp
+	input     string
+	pos       int
+	numTokens int
 }
 
-func NewLexer(tokens map[string]string, input string, skipWhitespace bool) *Lexer {
+func NewLexer(tokens map[string]string, input string) *Lexer {
 	lexer := &Lexer{
-		patterns:       make(map[string]*regexp.Regexp),
-		input:          strings.TrimSpace(input),
-		pos:            0,
-		numTokens:      0,
-		skipWhitespace: skipWhitespace,
+		patterns:  make(map[string]*regexp.Regexp),
+		input:     strings.TrimSpace(input),
+		pos:       0,
+		numTokens: 0,
 	}
+
 	for k, v := range tokens {
 		lexer.patterns[k] = regexp.MustCompile(v)
 	}
@@ -92,15 +99,20 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 	}
 
 	for k, v := range lex.patterns {
-		// TODO: Skip whitespace
-
 		// Check for a match
 		location := v.FindStringIndex(lex.input[lex.pos:])
 		if location == nil {
 			continue
 		}
 
+		tmpMatchLen := location[1] - location[0]
+		currMatchLen := matchPos[1] - matchPos[0]
+
 		if location[0] < matchPos[0] {
+			matchType = k
+			matchPos = location
+		} else if location[0] == matchPos[0] && tmpMatchLen > currMatchLen {
+			// Always select the token with the longest match
 			matchType = k
 			matchPos = location
 		}
@@ -118,7 +130,7 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 	token.kind = matchType
 	token.pos = lex.pos + start
 	token.size = matchLen
-	token.val = lex.input[token.pos : token.pos+matchLen]
+	token.val = strings.TrimSpace(lex.input[token.pos : token.pos+matchLen])
 
 	return token, nil
 }
@@ -142,12 +154,37 @@ func (lex *Lexer) Reset() {
 	lex.numTokens = 0
 }
 
+type ParseNode struct {
+	// Rule associated with this parse node
+	rule *histweet.RuleTweet
+
+	kind string
+
+	op string
+
+	// Logical operator to apply to the right of this parse node
+	logical string
+
+	// List of child nodes
+	children []*ParseNode
+
+	numChildren int
+}
+
+func (node *ParseNode) String() string {
+	return fmt.Sprintf("Kind: %s, Logical: %s, Op: %s, NumChildren: %d, Rule: %+v",
+		node.kind, node.logical, node.op, node.numChildren, node.rule)
+}
+
 // LL(1) parser for grammar defined above
 type Parser struct {
 	lexer *Lexer
 
 	// Pointer to the current token
 	currToken *Token
+
+	// Tree of parse nodes
+	treeRoot *ParseNode
 }
 
 func NewParser(input string) *Parser {
@@ -156,6 +193,8 @@ func NewParser(input string) *Parser {
 		"IDENT":  "[a-zA-Z_]+",
 		"NUMBER": "[0-9]+",
 		"STRING": `"[^\"]*"`,
+		"AGE":    `^\s*([0-9]+[ymd])?([0-9]+[ymd])?([0-9]+[ymd])`,
+		"TIME":   `\d\d-\w\w\w-\d\d\d\d`,
 		"LPAREN": `\(`,
 		"RPAREN": `\)`,
 		"OR":     `\|\|`,
@@ -170,10 +209,16 @@ func NewParser(input string) *Parser {
 		"NOTIN":  "!~",
 	}
 
-	lexer := NewLexer(tokens, input, true)
+	lexer := NewLexer(tokens, input)
 
 	parser := &Parser{
 		lexer: lexer,
+		treeRoot: &ParseNode{
+			children:    make([]*ParseNode, 0, 100),
+			numChildren: 0,
+			kind:        "root",
+			rule:        nil,
+		},
 	}
 
 	return parser
@@ -181,134 +226,252 @@ func NewParser(input string) *Parser {
 
 // Verifies that current token is of the specified `kind`,
 // returns it, and reads in the next token
-func (parser *Parser) match(kind string) (string, error) {
+func (parser *Parser) match(kind string) (string, string, error) {
 	currToken := parser.currToken
 	val := currToken.val
 
-	fmt.Println(currToken)
-
 	if currToken.kind != kind {
 		msg := fmt.Sprintf("Failed match for kind = %s", kind)
-		return "", errors.New(msg)
+		return "", "", errors.New(msg)
 	}
 
 	token, err := parser.lexer.NextToken()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	parser.currToken = token
 
-	return val, nil
+	return val, kind, nil
 }
 
-// *   Expr     	<-  ( Expr ) (Logical Expr)? | Cond (Logical Expr)?
-// *   Cond	        <-  Ident Op Literal
-// *   Logical      <-  Or | And
-// *   Op           <-  Gt | Gte | Lt | Lte | Eq | Neq | In | NotIn
-// *   Literal      <-  Number | String
-func (parser *Parser) expr() (bool, error) {
+func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
+	var op string
+	var err error
+	var node, logicalNode *ParseNode
+
 	if parser.currToken.kind == "LPAREN" {
-		_, err := parser.match("LPAREN")
+		_, _, err = parser.match("LPAREN")
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 
-		_, err1 := parser.expr()
-		if err1 != nil {
-			return false, err1
+		// For an expression, we know that this a non-terminal node,
+		// so we construct a new "parent" for the expr here
+		node = &ParseNode{
+			children:    make([]*ParseNode, 0, 100),
+			numChildren: 0,
+			kind:        "expr",
+			rule:        nil,
 		}
 
-		_, err2 := parser.match("RPAREN")
-		if err2 != nil {
-			return false, err2
+		_, err = parser.expr(node)
+		if err != nil {
+			return nil, err
+		}
+
+		_, _, err = parser.match("RPAREN")
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		// Condition
-		_, err := parser.cond()
+		node, err = parser.cond()
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 	}
 
 	// Improve this logic (TODO)
-	_, err3 := parser.logical()
-	if err3 != nil {
-		// No logical found (TODO)
-		return true, nil
+	op, err = parser.logical()
+	if err == nil {
+		// Logical found (TODO)
+		// Build a logical node and make it the new "parent" for the node
+		logicalNode = &ParseNode{
+			children:    make([]*ParseNode, 0, 2),
+			numChildren: 0,
+			kind:        "logical",
+			logical:     op,
+			rule:        nil,
+		}
+
+		logicalNode.children = append(logicalNode.children, node)
+		logicalNode.numChildren++
+
+		_, err = parser.expr(logicalNode)
+		if err != nil {
+			return nil, err
+		}
+
+		node = logicalNode
 	}
 
-	return parser.expr()
+	// Insert this node into the current parent node
+	parent.children = append(parent.children, node)
+	parent.numChildren++
+
+	return parent, nil
 }
 
-func (parser *Parser) cond() (bool, error) {
-	_, err := parser.ident()
+func (parser *Parser) cond() (*ParseNode, error) {
+	ident, err := parser.ident()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	_, err1 := parser.op()
+	op, err1 := parser.op()
 	if err1 != nil {
-		return false, err1
+		return nil, err1
 	}
 
-	_, err2 := parser.literal()
+	literal, kind, err2 := parser.literal()
 	if err2 != nil {
-		return false, err2
+		return nil, err2
 	}
 
-	return true, nil
+	// Build the rule
+	rule := &histweet.RuleTweet{}
+
+	switch ident {
+	case "age":
+		if kind != "AGE" {
+			return nil, errors.New("Invalid literal for \"age\"")
+		}
+
+		time, err3 := ConvertAgeToTime(literal)
+		if err3 != nil {
+			return nil, err3
+		}
+
+		switch op {
+		case "GT", "GTE":
+			rule.Before = time
+		case "LT", "LTE":
+			rule.After = time
+		default:
+			return nil, errors.New("Invalid operator for \"age\"")
+		}
+	case "text":
+		switch op {
+		case "IN", "NOTIN":
+			rule.Match = regexp.MustCompile(literal)
+		default:
+			return nil, errors.New("Invalid operator for \"text\"")
+		}
+	case "created":
+		if kind != "TIME" {
+			return nil, errors.New("Invalid literal for \"created\"")
+		}
+
+		time, err4 := time.Parse(TIME_LAYOUT, literal)
+		if err4 != nil {
+			return nil, errors.New(fmt.Sprintf("Invalid time provided: %s", literal))
+		}
+
+		switch op {
+		case "GT", "GTE":
+			rule.Before = time
+		case "LT", "LTE":
+			rule.After = time
+		default:
+			return nil, errors.New(fmt.Sprintf("Invalid time comparison operation: %s", op))
+		}
+	case "likes":
+		switch op {
+		case "LT", "LTE", "GT", "GTE", "EQ", "NEQ":
+			num, err := strconv.Atoi(literal)
+			if err != nil {
+				return nil, err
+			}
+
+			rule.MaxLikes = num
+		default:
+			return nil, errors.New("Invalid operator for \"likes\"")
+		}
+	default:
+		return nil, errors.New(fmt.Sprintf("Invalid identifier \"%s\"", ident))
+	}
+
+	node := &ParseNode{
+		kind:     "cond",
+		rule:     rule,
+		op:       op,
+		children: nil,
+	}
+
+	return node, nil
 }
 
-func (parser *Parser) ident() (bool, error) {
-	_, err := parser.match("IDENT")
+func (parser *Parser) ident() (string, error) {
+	val, _, err := parser.match("IDENT")
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	return true, nil
+	return val, nil
 }
 
-func (parser *Parser) logical() (bool, error) {
+func (parser *Parser) logical() (string, error) {
+	var kind string
+	var err error
+
 	switch parser.currToken.kind {
 	case "AND", "OR":
-		_, err := parser.match(parser.currToken.kind)
+		_, kind, err = parser.match(parser.currToken.kind)
 		if err != nil {
-			return false, err
+			return "", err
 		}
 	default:
-		return false, errors.New("Invalid logical operator")
+		return "", errors.New("Invalid logical operator")
 	}
 
-	return true, nil
+	return kind, nil
 }
 
-func (parser *Parser) op() (bool, error) {
+func (parser *Parser) op() (string, error) {
+	var kind string
+	var err error
+
 	switch parser.currToken.kind {
 	case "GTE", "GT", "LTE", "LT", "EQ", "NEQ", "IN", "NOTIN":
-		_, err := parser.match(parser.currToken.kind)
+		_, kind, err = parser.match(parser.currToken.kind)
 		if err != nil {
-			return false, err
+			return "", err
 		}
 	default:
-		return false, errors.New("Invalid comparison operator")
+		return "", errors.New("Invalid comparison operator")
 	}
 
-	return true, nil
+	return kind, nil
 }
 
-func (parser *Parser) literal() (bool, error) {
+func (parser *Parser) literal() (string, string, error) {
+	var val string
+	var kind string
+	var err error
+
 	switch parser.currToken.kind {
-	case "STRING", "NUMBER":
-		_, err := parser.match(parser.currToken.kind)
+	case "STRING", "NUMBER", "AGE", "TIME":
+		val, kind, err = parser.match(parser.currToken.kind)
 		if err != nil {
-			return false, err
+			return "", "", err
 		}
 	default:
-		return false, errors.New("Invalid literal")
+		return "", "", errors.New("Invalid literal")
 	}
 
-	return true, nil
+	return val, kind, nil
+}
+
+func PrintParseTree(currNode *ParseNode, depth int) {
+	if currNode.numChildren == 0 {
+		return
+	}
+
+	for _, node := range currNode.children {
+		fmt.Printf("depth = %d, %s\n", depth, node)
+		PrintParseTree(node, depth+1)
+	}
 }
 
 // Entry point for parser
@@ -320,7 +483,9 @@ func (parser *Parser) Parse() error {
 
 	parser.currToken = token
 
-	_, err1 := parser.expr()
+	_, err1 := parser.expr(parser.treeRoot)
+
+	// PrintParseTree(parser.treeRoot, 0)
 
 	return err1
 }
