@@ -35,10 +35,11 @@ jobs:
         cd cli && go build -v -o histweet; cd ..
         mkdir bin && mv cli/histweet bin/
 
-    - name: Test CLI and output coverage data
+    - name: Test lib
       run: |
-        cd cli && go test -v -covermode=count -coverprofile=coverage.out
+        cd lib && go test -v -covermode=count -coverprofile=coverage.out
 
-    - name: Upload coverage to Codecov
+    - name: Upload coverage data to Codecov
       run: |
         bash <(curl -s https://codecov.io/bash)
+        cd ..
