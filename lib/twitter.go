@@ -3,6 +3,7 @@ package histweet
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dghubble/go-twitter/twitter"
@@ -24,11 +25,47 @@ type Tweet struct {
 	IsReply     bool
 }
 
+// Returns true if this tweet matches all set fields in the given rule.
+func (tweet *Tweet) IsMatch(rule *RuleTweet) bool {
+	if rule == nil {
+		return false
+	}
+
+	createdAt := tweet.CreatedAt
+	isMatch := true
+
+	if !rule.Before.IsZero() {
+		isMatch = isMatch && createdAt.Before(rule.Before)
+	}
+
+	if !rule.After.IsZero() {
+		isMatch = isMatch && createdAt.After(rule.Before)
+	}
+
+	if rule.Contains != "" {
+		isMatch = isMatch && strings.Contains(tweet.Text, rule.Contains)
+	}
+
+	if rule.Match != nil {
+		isMatch = isMatch && (rule.Match.FindStringIndex(tweet.Text) != nil)
+	}
+
+	if rule.MaxLikes > 0 {
+		isMatch = isMatch && (tweet.NumLikes < rule.MaxLikes)
+	}
+
+	if rule.MaxRetweets > 0 {
+		isMatch = isMatch && (tweet.NumRetweets < rule.MaxRetweets)
+	}
+
+	return isMatch
+}
+
 // Convert an API tweet to internal tweet struct
-func convertApiTweet(from *twitter.Tweet) *Tweet {
+func convertApiTweet(from *twitter.Tweet) Tweet {
 	createdAt, _ := from.CreatedAtTime()
 
-	tweet := &Tweet{
+	tweet := Tweet{
 		Id:          from.ID,
 		CreatedAt:   createdAt,
 		Text:        from.Text,
@@ -72,11 +109,11 @@ func NewTwitterClient(
 // Fetch all timeline tweets for a given user based on the provided `Rule`.
 // This function sequentially calls the Twitter user timeline API without any
 // throttling.
-func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]int64, error) {
+func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 	// TODO: Handle throttling gracefully here
 	validCount := 0
 	totalCount := 0
-	tweets := make([]twitter.Tweet, 0, MAX_TIMELINE_TWEETS)
+	tweets := make([]Tweet, 0, MAX_TIMELINE_TWEETS)
 	var maxId int64 = 0
 
 	timelineParams := &twitter.UserTimelineParams{}
@@ -107,18 +144,21 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]int64, error) {
 					startIdx = 0
 				}
 
-				tweetsToCopy := returnedTweets[startIdx:]
-
-				tweets = append(tweets, tweetsToCopy...)
+				for _, tweet := range returnedTweets[startIdx:] {
+					converted := convertApiTweet(&tweet)
+					tweets = append(tweets, converted)
+				}
 			}
 		} else {
 			// Figure out if any of these tweets match the given rules
-			for i := 0; i < len(returnedTweets); i++ {
-				tweet := returnedTweets[i]
-				match, _ := rule.IsMatch(convertApiTweet(&tweet))
+			for _, tweet := range returnedTweets {
+				converted := convertApiTweet(&tweet)
+
+				// Check for a match
+				match := rule.Tweet.IsMatch(&converted)
 
 				if match {
-					tweets = append(tweets, tweet)
+					tweets = append(tweets, converted)
 					validCount++
 				}
 			}
@@ -136,19 +176,13 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]int64, error) {
 		totalCount += len(returnedTweets)
 	}
 
-	// Build an array of tweet IDs to return for deletion
-	tweetIds := make([]int64, len(tweets))
-	for i, tweet := range tweets {
-		tweetIds[i] = tweet.ID
-	}
-
-	return tweetIds, nil
+	return tweets, nil
 }
 
-func DeleteTweets(tweets []int64, client *twitter.Client) error {
+func DeleteTweets(tweets []Tweet, client *twitter.Client) error {
 	// TODO: Handle throttling gracefully here
-	for _, tweetId := range tweets {
-		_, _, err := client.Statuses.Destroy(tweetId, &twitter.StatusDestroyParams{})
+	for _, tweet := range tweets {
+		_, _, err := client.Statuses.Destroy(tweet.Id, &twitter.StatusDestroyParams{})
 		if err != nil {
 			return err
 		}

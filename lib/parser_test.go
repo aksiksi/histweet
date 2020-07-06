@@ -1,28 +1,8 @@
-package main
+package histweet
 
 import (
 	"testing"
 )
-
-var tokens = map[string]string{
-	"IDENT":  "[a-zA-Z_]+",
-	"NUMBER": "[0-9]+",
-	"STRING": `"[^\"]*"`,
-	"AGE":    `^\s*([0-9]+[ymd])?([0-9]+[ymd])?([0-9]+[ymd])`,
-	"TIME":   `\d\d-\w\w\w-\d\d\d\d`,
-	"LPAREN": `\(`,
-	"RPAREN": `\)`,
-	"OR":     `\|\|`,
-	"AND":    "&&",
-	"GTE":    ">=",
-	"GT":     ">",
-	"LTE":    "<=",
-	"LT":     "<",
-	"EQ":     "==",
-	"NEQ":    "!=",
-	"IN":     "~",
-	"NOTIN":  "!~",
-}
 
 func TestLexer(t *testing.T) {
 	var tests = map[string][]Token{
@@ -87,7 +67,7 @@ func TestLexer(t *testing.T) {
 	}
 
 	for input, expected := range tests {
-		lexer := NewLexer(tokens, input)
+		lexer := NewLexer(TOKENS, input)
 
 		t.Run(input, func(t *testing.T) {
 			for i := 0; i < len(expected); i++ {
@@ -113,21 +93,32 @@ func TestLexer(t *testing.T) {
 }
 
 func TestParser(t *testing.T) {
-	// Ensures that parser can successfully parse these inputs
-	var inputs []string = []string{
-		"age > 3m && (likes < 100 && likes == 34)",
-		"(age > 3m && (likes < 100 && likes >= 34)) || text !~ \"xyz\"",
-		`((text !~ "hey!") && (likes == 5) && (likes == 3)) || ( likes == 9)`,
-		`((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`,
+	// Ensures that parser can successfully parse some known inputs, and
+	// returns the correct number of parse nodes
+	var inputs = []struct {
+		input    string
+		numNodes int
+	}{
+		{"age > 3m && (likes < 100 && likes == 34)", 6},
+		{"(age > 3m && (likes < 100 && likes >= 34)) || text !~ \"xyz\"", 9},
+		{`((text !~ "hey!") && (likes == 5) && (likes == 3)) || ( likes == 9)`, 12},
+		{`((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`, 10},
 	}
 
 	for _, input := range inputs {
-		parser := NewParser(input)
+		parser := NewParser(input.input)
 
-		t.Run(input, func(t *testing.T) {
-			err := parser.Parse()
+		t.Run(input.input, func(t *testing.T) {
+			_, err := parser.Parse()
 			if err != nil {
 				t.Errorf("Failed to parse: %s", err)
+			}
+
+			numNodes := parser.rule.numNodes
+			expected := input.numNodes
+
+			if numNodes != expected {
+				t.Errorf("Parsed not count %d != expected %d\n", numNodes, expected)
 			}
 		})
 	}

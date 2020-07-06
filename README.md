@@ -32,9 +32,9 @@ In count mode, `histweet` just keeps the latest `N` tweets.  For example, we can
 histweet count -n 300 --daemon
 ```
 
-### Rules Mode
+### Rule Mode
 
-Rules mode is the more powerful and... practical mode.  In this mode, you can specify one or more *rules*. `histweet` will delete **all** tweets that match **all** of the provided rules. You can pass in the `--any` flag to instead delete tweets that match **any** of the provided rules.
+Rule mode is the more powerful and... practical mode.  In this mode, you can specify one or more *rules*. `histweet` will delete **all** tweets that match the provided rule(s).
 
 In this example, we delete all tweets that are:
 
@@ -43,16 +43,16 @@ In this example, we delete all tweets that are:
 3. Contain the word "dt" (as a regex pattern)
 
 ```
-histweet rules --age 3m5d --max-likes 3 --match '\sdt(\s|\.|$)'
+histweet rule 'age > 3m5d && likes < 3 && text ~ "dt"'
 ```
 
-To point `histweet` at your archive JSON, add the `--archive` flag like so:
+To point `histweet` at your archive JSON, pass in the `--archive` flag like so:
 
 ```
-histweet rules --age 3m5d --max-likes 3 --match '\sdt(\s|\.|$)' --archive /path/to/tweet.js
+histweet rule --archive /path/to/tweet.js 'age > 3m5d && likes < 3 && text ~ "dt"'
 ```
 
-The tool will now run the rules against the contents of your archive, and then use the Twitter API to delete all matching tweets. **Note:** the archive does not contain number of replies, so that rule is simply *ignored*.
+The tool will now run the same rules against the contents of your archive, and then use the Twitter API to delete all matching tweets.
 
 You can view full usage by passing in the `-h` flag.
 

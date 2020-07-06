@@ -27,13 +27,13 @@ type archiveEntry struct {
 }
 
 // Convert an archive tweet to internal tweet struct
-func convertArchiveTweet(from *archiveTweet) *Tweet {
+func convertArchiveTweet(from *archiveTweet) Tweet {
 	tweetId, _ := strconv.ParseInt(from.IdStr, 10, 64)
 	createdAt, _ := time.Parse(ARCHIVE_TIME_LAYOUT, from.CreatedAt)
 	favoriteCount, _ := strconv.Atoi(from.FavoriteCountStr)
 	retweetCount, _ := strconv.Atoi(from.RetweetCountStr)
 
-	tweet := &Tweet{
+	tweet := Tweet{
 		Id:          tweetId,
 		CreatedAt:   createdAt,
 		Text:        from.FullText,
@@ -47,11 +47,10 @@ func convertArchiveTweet(from *archiveTweet) *Tweet {
 }
 
 // Fetch tweets from provided Twitter archive
-func FetchArchiveTweets(rule *Rule, archive string) ([]int64, error) {
+func FetchArchiveTweets(rule *ParsedRule, archive string) ([]Tweet, error) {
 	var err error
 	var f *os.File
 	var info os.FileInfo
-	var res bool
 
 	f, err = os.Open(archive)
 	if err != nil {
@@ -81,31 +80,27 @@ func FetchArchiveTweets(rule *Rule, archive string) ([]int64, error) {
 	}
 
 	// Parse tweet archive as JSON
-	var tweets []archiveEntry
-	err = json.Unmarshal(buf, &tweets)
+	var origTweets []archiveEntry
+	err = json.Unmarshal(buf, &origTweets)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("Loaded %d tweets from provided archive", len(tweets))
+	log.Printf("Loaded %d tweets from provided archive", len(origTweets))
 
 	// Allocate buffer for tweet IDs that need to be deleted
-	tweetIds := make([]int64, 0, len(tweets))
+	tweets := make([]Tweet, 0, len(origTweets))
 
-	for _, entry := range tweets {
+	for _, entry := range origTweets {
 		// Convert tweet
 		old := &entry.Tweet
 		tweet := convertArchiveTweet(old)
 
-		res, err = rule.IsMatch(tweet)
-		if err != nil {
-			return nil, err
-		}
-
+		res := rule.IsMatch(&tweet)
 		if res {
-			tweetIds = append(tweetIds, tweet.Id)
+			tweets = append(tweets, tweet)
 		}
 	}
 
-	return tweetIds, nil
+	return tweets, nil
 }

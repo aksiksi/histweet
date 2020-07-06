@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -62,60 +61,9 @@ func buildCliApp() *cli.App {
 
 	tweetFlags := []cli.Flag{
 		&cli.StringFlag{
-			Name:    "age",
-			Aliases: []string{"a"},
-			Usage:   "Delete all tweets older than given `age` (ex: 10d, 1m, 1y, 6m1d, 1y3m1d)",
-		},
-		&cli.StringFlag{
-			Name:        "contains",
-			Aliases:     []string{"c"},
-			Usage:       "Delete all tweets that contain the given `string`",
-			DefaultText: "ignored",
-		},
-		&cli.StringFlag{
-			Name:        "match",
-			Aliases:     []string{"m"},
-			Usage:       "Delete all tweets that match given `regex`",
-			DefaultText: "ignored",
-		},
-		&cli.TimestampFlag{
-			Name:        "before",
-			Aliases:     []string{"b"},
-			Usage:       "Delete all tweets before given `date` (ex: 2020-May-10)",
-			Layout:      "2006-Jan-02",
-			DefaultText: "ignored",
-		},
-		&cli.TimestampFlag{
-			Name:        "after",
-			Aliases:     []string{"f"},
-			Usage:       "Delete all tweets after given `date` (ex: 2020-May-10)",
-			Layout:      "2006-Jan-02",
-			DefaultText: "ignored",
-		},
-		&cli.IntFlag{
-			Name:    "max-likes",
-			Aliases: []string{"l"},
-			Usage:   "Delete all tweets with fewer than `N` likes",
-		},
-		&cli.IntFlag{
-			Name:    "max-retweets",
-			Aliases: []string{"t"},
-			Usage:   "Delete all tweets with fewer than `N` retweets",
-		},
-		&cli.StringFlag{
 			Name:        "archive",
 			Usage:       "Path to tweet archive `file` (tweet.js)",
 			DefaultText: "Timeline API lookup",
-		},
-		&cli.BoolFlag{
-			Name:  "invert",
-			Value: false,
-			Usage: "Delete tweets that do _not_ match the specified rules",
-		},
-		&cli.BoolFlag{
-			Name:  "any",
-			Value: false,
-			Usage: "Delete tweets that match _any_ of the rules",
 		},
 		&cli.StringFlag{
 			Name:     "consumer-key",
@@ -179,7 +127,7 @@ func buildCliApp() *cli.App {
 				Action:  handleCli,
 			},
 			{
-				Name:    "rules",
+				Name:    "rule",
 				Flags:   tweetFlags,
 				Usage:   "Delete all tweets that match one or more rules",
 				Aliases: []string{"r"},
@@ -192,23 +140,10 @@ func buildCliApp() *cli.App {
 }
 
 func main() {
-	input, err := ioutil.ReadFile("/tmp/input")
+	app := buildCliApp()
+
+	err := app.Run(os.Args)
 	if err != nil {
-		log.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-
-	parser := NewParser(string(input))
-
-	err1 := parser.Parse()
-	if err1 != nil {
-		log.Fatal(err1)
-	}
-
-	// app := buildCliApp()
-
-	// err := app.Run(os.Args)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 }
