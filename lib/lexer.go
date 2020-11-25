@@ -75,18 +75,19 @@ func NewLexer(tokens map[tokenKind]string, input string) *Lexer {
 // Fetches the next token from the input
 // Returns an error if no valid token was found
 func (lex *Lexer) PeekToken() (*Token, error) {
-	// Iterate over each pattern and find the closest match
-	// TODO: Can we improve this?
-	matchPos := []int{math.MaxInt32, 0}
-	matchType := tokenEOF
-
-	token := &Token{kind: tokenEOF, pos: -1}
+	// By default, token is EOF with a position one past the end of the input
+	token := &Token{kind: tokenEOF, pos: len(lex.input)}
 
 	if lex.pos >= len(lex.input) {
 		// Reached the end of the input
 		return token, nil
 	}
 
+	matchPos := []int{math.MaxInt32, 0}
+	matchType := tokenEOF
+
+	// Iterate over each pattern and find the closest match
+	// TODO: Can we improve this?
 	for k, v := range lex.patterns {
 		// Check for a match
 		location := v.FindStringIndex(lex.input[lex.pos:])
@@ -101,7 +102,7 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 			matchType = k
 			matchPos = location
 		} else if location[0] == matchPos[0] && tmpMatchLen > currMatchLen {
-			// Always select the token with the longest match
+			// Always select the token with the _longest_ match
 			matchType = k
 			matchPos = location
 		}
@@ -123,7 +124,7 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 	return token, nil
 }
 
-// Fetches next token in the input, then advances the lexer position
+// Fetch/peek the next token in the input, then advance the lexer position
 func (lex *Lexer) NextToken() (*Token, error) {
 	token, err := lex.PeekToken()
 	if err != nil {
@@ -137,6 +138,7 @@ func (lex *Lexer) NextToken() (*Token, error) {
 	return token, nil
 }
 
+// Reset the lexer to the start of the input
 func (lex *Lexer) Reset() {
 	lex.pos = 0
 	lex.numTokens = 0
