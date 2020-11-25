@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -17,7 +16,6 @@ const (
 	MIN_DAEMON_INTERVAL = 30
 )
 
-// CLI args struct
 type Args struct {
 	// Whether or not to run in daemon mode
 	Daemon   bool
@@ -88,7 +86,7 @@ func runSingle(args *Args, client *twitter.Client) error {
 func runDaemon(args *Args, client *twitter.Client) error {
 	interval := time.Duration(args.Interval)
 	if interval < MIN_DAEMON_INTERVAL {
-		return errors.New(fmt.Sprintf("The minimum daemon interal is %d", MIN_DAEMON_INTERVAL))
+		return fmt.Errorf("The minimum daemon interal is %d", MIN_DAEMON_INTERVAL)
 	}
 
 	ticker := time.NewTicker(interval * time.Second)
@@ -109,7 +107,7 @@ func runDaemon(args *Args, client *twitter.Client) error {
 	return nil
 }
 
-func Run(args *Args) error {
+func run(args *Args) error {
 	fmt.Println("\nRules")
 	fmt.Println("=====")
 
@@ -218,7 +216,7 @@ func handleCli(c *cli.Context) error {
 	}
 
 	// Run the command!
-	err := Run(args)
+	err := run(args)
 	if err != nil {
 		return err
 	}

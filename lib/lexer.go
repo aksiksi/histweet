@@ -1,7 +1,6 @@
 package histweet
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -12,8 +11,39 @@ const (
 	TIME_LAYOUT = "02-Jan-2006"
 )
 
+type tokenKind int
+
+const (
+	// Identifiers and literals
+	tokenIdent tokenKind = iota
+	tokenNumber
+	tokenString
+	tokenAge
+	tokenTime
+
+	// Grouping
+	tokenLparen
+	tokenRparen
+
+	// Logical operators
+	tokenOr
+	tokenAnd
+
+	// Comparison operators
+	tokenGte
+	tokenGt
+	tokenLte
+	tokenLt
+	tokenEq
+	tokenNeq
+	tokenIn
+	tokenNotIn
+
+	tokenEOF
+)
+
 type Token struct {
-	kind string
+	kind tokenKind
 	val  string
 	pos  int
 	size int
@@ -21,15 +51,15 @@ type Token struct {
 
 // Internal lexer state
 type Lexer struct {
-	patterns  map[string]*regexp.Regexp
+	patterns  map[tokenKind]*regexp.Regexp
 	input     string
 	pos       int
 	numTokens int
 }
 
-func NewLexer(tokens map[string]string, input string) *Lexer {
+func NewLexer(tokens map[tokenKind]string, input string) *Lexer {
 	lexer := &Lexer{
-		patterns:  make(map[string]*regexp.Regexp),
+		patterns:  make(map[tokenKind]*regexp.Regexp),
 		input:     strings.TrimSpace(input),
 		pos:       0,
 		numTokens: 0,
@@ -48,14 +78,12 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 	// Iterate over each pattern and find the closest match
 	// TODO: Can we improve this?
 	matchPos := []int{math.MaxInt32, 0}
-	matchType := ""
+	matchType := tokenEOF
 
-	token := &Token{}
+	token := &Token{kind: tokenEOF, pos: -1}
 
 	if lex.pos >= len(lex.input) {
 		// Reached the end of the input
-		token.kind = "EOF"
-		token.pos = -1
 		return token, nil
 	}
 
@@ -79,9 +107,8 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 		}
 	}
 
-	if matchType == "" {
-		msg := fmt.Sprintf("No match found at position %d", lex.pos)
-		return nil, errors.New(msg)
+	if matchType == tokenEOF {
+		return nil, fmt.Errorf("No match found at position %d", lex.pos)
 	}
 
 	start, end := matchPos[0], matchPos[1]

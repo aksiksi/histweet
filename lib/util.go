@@ -1,7 +1,6 @@
 package histweet
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -18,7 +17,7 @@ func ConvertAgeToTime(age string) (time.Time, error) {
 
 	matches := agePat.FindStringSubmatch(age)
 	if matches == nil {
-		return time.Time{}, errors.New(fmt.Sprintf("Invalid age string provided: %s", age))
+		return time.Time{}, fmt.Errorf("Invalid age string provided: %s", age)
 	}
 
 	for _, match := range matches[1:] {
@@ -40,7 +39,7 @@ func ConvertAgeToTime(age string) (time.Time, error) {
 		case 'y':
 			years = int(val)
 		default:
-			return time.Time{}, errors.New("Invalid age string provided: must only contain \"d\", \"m\", or \"y\"")
+			return time.Time{}, fmt.Errorf("Invalid age string provided: must only contain \"d\", \"m\", or \"y\"")
 		}
 	}
 

@@ -1,7 +1,6 @@
 package histweet
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -9,24 +8,24 @@ import (
 )
 
 // Tokens for terminals of the Twitter rule parser grammar
-var TOKENS = map[string]string{
-	"IDENT":  "[a-zA-Z_]+",
-	"NUMBER": "[0-9]+",
-	"STRING": `"[^\"]*"`,
-	"AGE":    `^\s*([0-9]+[ymd])?([0-9]+[ymd])?([0-9]+[ymd])`,
-	"TIME":   `\d\d-\w\w\w-\d\d\d\d`,
-	"LPAREN": `\(`,
-	"RPAREN": `\)`,
-	"OR":     `\|\|`,
-	"AND":    "&&",
-	"GTE":    ">=",
-	"GT":     ">",
-	"LTE":    "<=",
-	"LT":     "<",
-	"EQ":     "==",
-	"NEQ":    "!=",
-	"IN":     "~",
-	"NOTIN":  "!~",
+var TOKENS = map[tokenKind]string{
+	tokenIdent:  "[a-zA-Z_]+",
+	tokenNumber: "[0-9]+",
+	tokenString: `"[^\"]*"`,
+	tokenAge:    `^\s*([0-9]+[ymd])?([0-9]+[ymd])?([0-9]+[ymd])`,
+	tokenTime:   `\d\d-\w\w\w-\d\d\d\d`,
+	tokenLparen: `\(`,
+	tokenRparen: `\)`,
+	tokenOr:     `\|\|`,
+	tokenAnd:    "&&",
+	tokenGte:    ">=",
+	tokenGt:     ">",
+	tokenLte:    "<=",
+	tokenLt:     "<",
+	tokenEq:     "==",
+	tokenNeq:    "!=",
+	tokenIn:     "~",
+	tokenNotIn:  "!~",
 }
 
 // Represents a single node in the parse tree.
@@ -43,14 +42,14 @@ var TOKENS = map[string]string{
 // Reset() method.
 type ParseNode struct {
 	kind        string
-	op          string
+	op          tokenKind
 	rule        *RuleTweet
 	children    []*ParseNode
 	numChildren int
 }
 
 func (node *ParseNode) String() string {
-	return fmt.Sprintf("Kind: %s, Op: %s, NumChildren: %d, Rule: %+v",
+	return fmt.Sprintf("Kind: %s, Op: %d, NumChildren: %d, Rule: %+v",
 		node.kind, node.op, node.numChildren, node.rule)
 }
 
@@ -83,12 +82,12 @@ func evalInternal(tweet *Tweet, node *ParseNode) bool {
 		right := evalInternal(tweet, node.children[1])
 
 		switch node.op {
-		case "AND":
+		case tokenAnd:
 			return left && right
-		case "OR":
+		case tokenOr:
 			return left || right
 		default:
-			panic(fmt.Sprintf("Unexpected logical op: %s\n", node.op))
+			panic(fmt.Sprintf("Unexpected logical op: %d\n", node.op))
 		}
 	} else {
 		// TODO: Does this make sense?
@@ -176,12 +175,11 @@ func NewParser(input string) *Parser {
 
 // Verifies that current token is of the specified `kind`,
 // returns it, and reads in the next token
-func (parser *Parser) match(kind string) (*Token, error) {
+func (parser *Parser) match(kind tokenKind) (*Token, error) {
 	currToken := parser.currToken
 
 	if currToken.kind != kind {
-		msg := fmt.Sprintf("Failed match for kind = %s", kind)
-		return nil, errors.New(msg)
+		return nil, fmt.Errorf("Failed match for kind = %d", kind)
 	}
 
 	token, err := parser.lexer.NextToken()
@@ -199,8 +197,8 @@ func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
 	var err error
 	var node, logicalNode *ParseNode
 
-	if parser.currToken.kind == "LPAREN" {
-		_, err = parser.match("LPAREN")
+	if parser.currToken.kind == tokenLparen {
+		_, err = parser.match(tokenLparen)
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +217,7 @@ func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
 			return nil, err
 		}
 
-		_, err = parser.match("RPAREN")
+		_, err = parser.match(tokenRparen)
 		if err != nil {
 			return nil, err
 		}
@@ -287,7 +285,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 
 	switch ident.val {
 	case "age":
-		if literal.kind != "AGE" {
+		if literal.kind != tokenAge {
 			msg := fmt.Sprintf("Invalid literal for \"age\": %s", literal.val)
 			return nil, NewParserError(msg, literal)
 		}
@@ -299,9 +297,9 @@ func (parser *Parser) cond() (*ParseNode, error) {
 		}
 
 		switch op.kind {
-		case "GT", "GTE":
+		case tokenGt, tokenGte:
 			rule.Before = time
-		case "LT", "LTE":
+		case tokenLt, tokenLte:
 			rule.After = time
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"age\": %s", op.val)
@@ -309,14 +307,14 @@ func (parser *Parser) cond() (*ParseNode, error) {
 		}
 	case "text":
 		switch op.kind {
-		case "IN", "NOTIN":
+		case tokenIn, tokenNotIn:
 			rule.Match = regexp.MustCompile(literal.val)
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"text\": %s", op.val)
 			return nil, NewParserError(msg, op)
 		}
 	case "created":
-		if literal.kind != "TIME" {
+		if literal.kind != tokenTime {
 			msg := fmt.Sprintf("Invalid literal for \"created\": %s", literal.val)
 			return nil, NewParserError(msg, literal)
 		}
@@ -328,9 +326,9 @@ func (parser *Parser) cond() (*ParseNode, error) {
 		}
 
 		switch op.kind {
-		case "GT", "GTE":
+		case tokenGt, tokenGte:
 			rule.Before = time
-		case "LT", "LTE":
+		case tokenLt, tokenLte:
 			rule.After = time
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"created\": %s", op.val)
@@ -338,7 +336,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 		}
 	case "likes":
 		switch op.kind {
-		case "LT", "LTE", "GT", "GTE", "EQ", "NEQ":
+		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
 				msg := fmt.Sprintf("Invalid number for \"likes\": %s", literal.val)
@@ -353,7 +351,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 		}
 	case "reweets":
 		switch op.kind {
-		case "LT", "LTE", "GT", "GTE", "EQ", "NEQ":
+		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
 				msg := fmt.Sprintf("Invalid number for \"reweets\": %s", literal.val)
@@ -382,7 +380,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 }
 
 func (parser *Parser) ident() (*Token, error) {
-	token, err := parser.match("IDENT")
+	token, err := parser.match(tokenIdent)
 	if err != nil {
 		return nil, err
 	}
@@ -395,13 +393,13 @@ func (parser *Parser) logical() (*Token, error) {
 	var err error
 
 	switch parser.currToken.kind {
-	case "AND", "OR":
+	case tokenAnd, tokenOr:
 		token, err = parser.match(parser.currToken.kind)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		return nil, errors.New("Invalid logical operator")
+		return nil, fmt.Errorf("Invalid logical operator")
 	}
 
 	return token, nil
@@ -412,13 +410,13 @@ func (parser *Parser) op() (*Token, error) {
 	var err error
 
 	switch parser.currToken.kind {
-	case "GTE", "GT", "LTE", "LT", "EQ", "NEQ", "IN", "NOTIN":
+	case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq, tokenIn, tokenNotIn:
 		token, err = parser.match(parser.currToken.kind)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		return nil, errors.New("Invalid comparison operator")
+		return nil, fmt.Errorf("Invalid comparison operator")
 	}
 
 	return token, nil
@@ -429,13 +427,13 @@ func (parser *Parser) literal() (*Token, error) {
 	var err error
 
 	switch parser.currToken.kind {
-	case "STRING", "NUMBER", "AGE", "TIME":
+	case tokenString, tokenNumber, tokenAge, tokenTime:
 		token, err = parser.match(parser.currToken.kind)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		return nil, errors.New("Invalid literal")
+		return nil, fmt.Errorf("Invalid literal")
 	}
 
 	return token, nil

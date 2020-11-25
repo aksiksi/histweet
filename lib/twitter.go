@@ -1,7 +1,6 @@
 package histweet
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -99,7 +98,7 @@ func NewTwitterClient(
 
 		_, _, err := client.Accounts.VerifyCredentials(verifyParams)
 		if err != nil {
-			return nil, errors.New("Invalid user credentials provided")
+			return nil, fmt.Errorf("Invalid user credentials provided")
 		}
 	}
 
@@ -129,7 +128,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 		// Fetch a set of tweets (max. 200)
 		returnedTweets, _, err := client.Timelines.UserTimeline(timelineParams)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("Something went wrong while fetching timeline tweets: %s", err.Error()))
+			return nil, fmt.Errorf("Something went wrong while fetching timeline tweets: %s", err.Error())
 		}
 
 		if rule.Count != nil {
