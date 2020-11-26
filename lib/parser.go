@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -434,16 +435,22 @@ func (parser *Parser) literal() (*token, error) {
 	return token, nil
 }
 
-// PrintParsedRule is a helper that prints out a tree of ParseNodes
-func PrintParsedRule(currNode *ParseNode, depth int) {
-	if currNode.numChildren == 0 {
+func toStringHelper(p *ParseNode, depth int, output *strings.Builder) {
+	if p.numChildren == 0 {
 		return
 	}
 
-	for _, node := range currNode.children {
-		fmt.Printf("depth = %d, %s\n", depth, node)
-		PrintParsedRule(node, depth+1)
+	for _, node := range p.children {
+		s := fmt.Sprintf("depth = %d, %s", depth, node)
+		output.WriteString(s)
 	}
+}
+
+// ToString walks the parse tree and outputs it in string form
+func (rule *ParsedRule) ToString() string {
+	var output strings.Builder
+	toStringHelper(rule.root, 0, &output)
+	return output.String()
 }
 
 // NewParser builds a new Parser from the input
