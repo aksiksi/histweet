@@ -14,7 +14,7 @@ const (
 )
 
 type Tweet struct {
-	Id          int64
+	ID          int64
 	CreatedAt   time.Time
 	Text        string
 	NumLikes    int
@@ -65,7 +65,7 @@ func convertApiTweet(from *twitter.Tweet) Tweet {
 	createdAt, _ := from.CreatedAtTime()
 
 	tweet := Tweet{
-		Id:          from.ID,
+		ID:          from.ID,
 		CreatedAt:   createdAt,
 		Text:        from.Text,
 		NumLikes:    from.FavoriteCount,
@@ -113,7 +113,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 	validCount := 0
 	totalCount := 0
 	tweets := make([]Tweet, 0, MAX_TIMELINE_TWEETS)
-	var maxId int64 = 0
+	var maxID int64 = 0
 
 	timelineParams := &twitter.UserTimelineParams{}
 
@@ -123,7 +123,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 			break
 		}
 
-		timelineParams.MaxID = maxId
+		timelineParams.MaxID = maxID
 
 		// Fetch a set of tweets (max. 200)
 		returnedTweets, _, err := client.Timelines.UserTimeline(timelineParams)
@@ -170,7 +170,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 
 		// Store the last tweet's maxId to search for older tweets on the next
 		// API call
-		maxId = returnedTweets[len(returnedTweets)-1].ID
+		maxID = returnedTweets[len(returnedTweets)-1].ID
 
 		totalCount += len(returnedTweets)
 	}
@@ -181,7 +181,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 func DeleteTweets(tweets []Tweet, client *twitter.Client) error {
 	// TODO: Handle throttling gracefully here
 	for _, tweet := range tweets {
-		_, _, err := client.Statuses.Destroy(tweet.Id, &twitter.StatusDestroyParams{})
+		_, _, err := client.Statuses.Destroy(tweet.ID, &twitter.StatusDestroyParams{})
 		if err != nil {
 			return err
 		}

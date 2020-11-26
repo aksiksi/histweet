@@ -15,7 +15,7 @@ const (
 
 // Relevant fields for a tweet in archive JSON format
 type archiveTweet struct {
-	IdStr            string `json:"id"`
+	IDStr            string `json:"id"`
 	CreatedAt        string `json:"created_at"`
 	FullText         string `json:"full_text"`
 	FavoriteCountStr string `json:"favorite_count"`
@@ -28,13 +28,13 @@ type archiveEntry struct {
 
 // Convert an archive tweet to internal tweet struct
 func convertArchiveTweet(from *archiveTweet) Tweet {
-	tweetId, _ := strconv.ParseInt(from.IdStr, 10, 64)
+	tweetID, _ := strconv.ParseInt(from.IDStr, 10, 64)
 	createdAt, _ := time.Parse(ARCHIVE_TIME_LAYOUT, from.CreatedAt)
 	favoriteCount, _ := strconv.Atoi(from.FavoriteCountStr)
 	retweetCount, _ := strconv.Atoi(from.RetweetCountStr)
 
 	tweet := Tweet{
-		Id:          tweetId,
+		ID:          tweetID,
 		CreatedAt:   createdAt,
 		Text:        from.FullText,
 		NumLikes:    favoriteCount,
@@ -93,14 +93,15 @@ func FetchArchiveTweets(rule *ParsedRule, archive string) ([]Tweet, error) {
 
 	for _, entry := range origTweets {
 		// Convert tweet
-		old := &entry.Tweet
-		tweet := convertArchiveTweet(old)
+		tweet := convertArchiveTweet(&entry.Tweet)
 
-		res := rule.IsMatch(&tweet)
-		if res {
+		// If the tweet matches the provided rule, append it to the tweet
+		// list
+		if rule.IsMatch(&tweet) {
 			tweets = append(tweets, tweet)
 		}
 	}
 
+	// Return the list of tweets to delete
 	return tweets, nil
 }
