@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-// Keep the N latest tweets
+// RuleCount keeps the N latest tweets.
 // If `Latest` is set to `true`, delete the N latest tweets
 type RuleCount struct {
 	N      int
 	Latest bool
 }
 
-// Rules that are processed based on tweet content or metadata
+// RuleTweet checks each Tweet against a set of conditions
 type RuleTweet struct {
 	Before      time.Time
 	After       time.Time

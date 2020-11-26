@@ -7,7 +7,11 @@ import (
 	"time"
 )
 
-// Tokens for terminals of the Twitter rule parser grammar
+const (
+	timeLayout = "02-Jan-2006"
+)
+
+// TOKENS for terminals of the Twitter rule parser grammar
 var TOKENS = map[tokenKind]string{
 	tokenIdent:  "[a-zA-Z_]+",
 	tokenNumber: "[0-9]+",
@@ -28,7 +32,7 @@ var TOKENS = map[tokenKind]string{
 	tokenNotIn:  "!~",
 }
 
-// Represents a single node in the parse tree.
+// ParseNode represents a single node in the parse tree.
 //
 // Each node has a kind, which is one of: "expr", "logical", or "cond".
 // Logical nodes indicate that the node's two children are connected by a
@@ -53,13 +57,14 @@ func (node *ParseNode) String() string {
 		node.kind, node.op, node.numChildren, node.rule)
 }
 
+// ParsedRule represents a single parsed Rule as a tree of ParseNodes.
 type ParsedRule struct {
 	root     *ParseNode
 	input    string
 	numNodes int
 }
 
-func NewParsedRule(input string) *ParsedRule {
+func newParsedRule(input string) *ParsedRule {
 	root := &ParseNode{
 		children:    make([]*ParseNode, 0, 100),
 		numChildren: 0,
@@ -95,14 +100,14 @@ func evalInternal(tweet *Tweet, node *ParseNode) bool {
 	}
 }
 
-// Walk the parse tree and evaluate each condition against the given Tweet.
-// Return true if the Tweet matches all of the rules.
+// IsMatch walks the parse tree and evaluates each condition against
+// the given Tweet. Returns true if the Tweet matches all of the rules.
 func (rule *ParsedRule) IsMatch(tweet *Tweet) bool {
 	root := rule.root
 	return evalInternal(tweet, root)
 }
 
-// A simple parser for tweet deletion rules.
+// Parser is a simple parser for tweet deletion rule strings.
 //
 // Examples:
 //
@@ -137,52 +142,42 @@ func (rule *ParsedRule) IsMatch(tweet *Tweet) bool {
 // In      :=  ~
 // NotIn   :=  !~
 type Parser struct {
-	lexer *Lexer
+	lexer *lexer
 
 	// Pointer to the current token
-	currToken *Token
+	currToken *token
 
 	// Tree of parse nodes
 	rule *ParsedRule
 }
 
+// ParserError represents errors hit during rule parsing
 type ParserError struct {
 	msg   string
-	token *Token
+	token *token
 }
 
 func (err *ParserError) Error() string {
 	return fmt.Sprintf("Parser Error: %s (col %d)", err.msg, err.token.pos)
 }
 
-func NewParserError(msg string, token *Token) *ParserError {
+func newParserError(msg string, token *token) *ParserError {
 	return &ParserError{
 		msg:   msg,
 		token: token,
 	}
 }
 
-func NewParser(input string) *Parser {
-	lexer := NewLexer(TOKENS, input)
-
-	parser := &Parser{
-		lexer: lexer,
-		rule:  NewParsedRule(input),
-	}
-
-	return parser
-}
-
 // Verifies that current token is of the specified `kind`,
 // returns it, and reads in the next token
-func (parser *Parser) match(kind tokenKind) (*Token, error) {
+func (parser *Parser) match(kind tokenKind) (*token, error) {
 	currToken := parser.currToken
 
 	if currToken.kind != kind {
 		return nil, fmt.Errorf("Failed match for kind = %d", kind)
 	}
 
-	token, err := parser.lexer.NextToken()
+	token, err := parser.lexer.nextToken()
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +188,7 @@ func (parser *Parser) match(kind tokenKind) (*Token, error) {
 }
 
 func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
-	var token *Token
+	var token *token
 	var err error
 	var node, logicalNode *ParseNode
 
@@ -287,13 +282,13 @@ func (parser *Parser) cond() (*ParseNode, error) {
 	case "age":
 		if literal.kind != tokenAge {
 			msg := fmt.Sprintf("Invalid literal for \"age\": %s", literal.val)
-			return nil, NewParserError(msg, literal)
+			return nil, newParserError(msg, literal)
 		}
 
-		time, err3 := ConvertAgeToTime(literal.val)
+		time, err3 := convertAgeToTime(literal.val)
 		if err3 != nil {
 			msg := fmt.Sprintf("Invalid format for \"age\": %s", literal.val)
-			return nil, NewParserError(msg, literal)
+			return nil, newParserError(msg, literal)
 		}
 
 		switch op.kind {
@@ -303,7 +298,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 			rule.After = time
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"age\": %s", op.val)
-			return nil, NewParserError(msg, op)
+			return nil, newParserError(msg, op)
 		}
 	case "text":
 		switch op.kind {
@@ -311,18 +306,18 @@ func (parser *Parser) cond() (*ParseNode, error) {
 			rule.Match = regexp.MustCompile(literal.val)
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"text\": %s", op.val)
-			return nil, NewParserError(msg, op)
+			return nil, newParserError(msg, op)
 		}
 	case "created":
 		if literal.kind != tokenTime {
 			msg := fmt.Sprintf("Invalid literal for \"created\": %s", literal.val)
-			return nil, NewParserError(msg, literal)
+			return nil, newParserError(msg, literal)
 		}
 
-		time, err4 := time.Parse(TIME_LAYOUT, literal.val)
+		time, err4 := time.Parse(timeLayout, literal.val)
 		if err4 != nil {
 			msg := fmt.Sprintf("Invalid format for time for \"created\": %s", literal.val)
-			return nil, NewParserError(msg, literal)
+			return nil, newParserError(msg, literal)
 		}
 
 		switch op.kind {
@@ -332,7 +327,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 			rule.After = time
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"created\": %s", op.val)
-			return nil, NewParserError(msg, op)
+			return nil, newParserError(msg, op)
 		}
 	case "likes":
 		switch op.kind {
@@ -340,14 +335,14 @@ func (parser *Parser) cond() (*ParseNode, error) {
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
 				msg := fmt.Sprintf("Invalid number for \"likes\": %s", literal.val)
-				return nil, NewParserError(msg, literal)
+				return nil, newParserError(msg, literal)
 			}
 
 			// TODO
 			rule.MaxLikes = num
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"likes\": %s", op.val)
-			return nil, NewParserError(msg, op)
+			return nil, newParserError(msg, op)
 		}
 	case "reweets":
 		switch op.kind {
@@ -355,18 +350,18 @@ func (parser *Parser) cond() (*ParseNode, error) {
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
 				msg := fmt.Sprintf("Invalid number for \"reweets\": %s", literal.val)
-				return nil, NewParserError(msg, literal)
+				return nil, newParserError(msg, literal)
 			}
 
 			// TODO
 			rule.MaxRetweets = num
 		default:
 			msg := fmt.Sprintf("Invalid operator for \"reweets\": %s", op.val)
-			return nil, NewParserError(msg, op)
+			return nil, newParserError(msg, op)
 		}
 	default:
 		msg := fmt.Sprintf("Invalid identifier: %s", ident.val)
-		return nil, NewParserError(msg, op)
+		return nil, newParserError(msg, op)
 	}
 
 	node := &ParseNode{
@@ -379,7 +374,7 @@ func (parser *Parser) cond() (*ParseNode, error) {
 	return node, nil
 }
 
-func (parser *Parser) ident() (*Token, error) {
+func (parser *Parser) ident() (*token, error) {
 	token, err := parser.match(tokenIdent)
 	if err != nil {
 		return nil, err
@@ -388,8 +383,8 @@ func (parser *Parser) ident() (*Token, error) {
 	return token, nil
 }
 
-func (parser *Parser) logical() (*Token, error) {
-	var token *Token
+func (parser *Parser) logical() (*token, error) {
+	var token *token
 	var err error
 
 	switch parser.currToken.kind {
@@ -405,8 +400,8 @@ func (parser *Parser) logical() (*Token, error) {
 	return token, nil
 }
 
-func (parser *Parser) op() (*Token, error) {
-	var token *Token
+func (parser *Parser) op() (*token, error) {
+	var token *token
 	var err error
 
 	switch parser.currToken.kind {
@@ -422,8 +417,8 @@ func (parser *Parser) op() (*Token, error) {
 	return token, nil
 }
 
-func (parser *Parser) literal() (*Token, error) {
-	var token *Token
+func (parser *Parser) literal() (*token, error) {
+	var token *token
 	var err error
 
 	switch parser.currToken.kind {
@@ -439,6 +434,7 @@ func (parser *Parser) literal() (*Token, error) {
 	return token, nil
 }
 
+// PrintParsedRule is a helper that prints out a tree of ParseNodes
 func PrintParsedRule(currNode *ParseNode, depth int) {
 	if currNode.numChildren == 0 {
 		return
@@ -450,15 +446,27 @@ func PrintParsedRule(currNode *ParseNode, depth int) {
 	}
 }
 
-// Reset this Parser to a clean state with the provided input
-func (parser *Parser) Reset(input string) {
-	parser.lexer = NewLexer(TOKENS, input)
-	parser.rule = NewParsedRule(input)
+// NewParser builds a new Parser from the input
+func NewParser(input string) *Parser {
+	lexer := newLexer(TOKENS, input)
+
+	parser := &Parser{
+		lexer: lexer,
+		rule:  newParsedRule(input),
+	}
+
+	return parser
 }
 
-// Entry point for parser
+// Reset this Parser to a clean state with the provided input
+func (parser *Parser) Reset(input string) {
+	parser.lexer = newLexer(TOKENS, input)
+	parser.rule = newParsedRule(input)
+}
+
+// Parse is the entry point for parser
 func (parser *Parser) Parse() (*ParsedRule, error) {
-	token, err := parser.lexer.NextToken()
+	token, err := parser.lexer.nextToken()
 	if err != nil {
 		return nil, err
 	}

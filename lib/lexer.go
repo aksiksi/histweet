@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	TIME_LAYOUT = "02-Jan-2006"
-)
-
 type tokenKind int
 
 const (
@@ -42,23 +38,22 @@ const (
 	tokenEOF
 )
 
-type Token struct {
+type token struct {
 	kind tokenKind
 	val  string
 	pos  int
 	size int
 }
 
-// Internal lexer state
-type Lexer struct {
+type lexer struct {
 	patterns  map[tokenKind]*regexp.Regexp
 	input     string
 	pos       int
 	numTokens int
 }
 
-func NewLexer(tokens map[tokenKind]string, input string) *Lexer {
-	lexer := &Lexer{
+func newLexer(tokens map[tokenKind]string, input string) *lexer {
+	lexer := &lexer{
 		patterns:  make(map[tokenKind]*regexp.Regexp),
 		input:     strings.TrimSpace(input),
 		pos:       0,
@@ -74,9 +69,9 @@ func NewLexer(tokens map[tokenKind]string, input string) *Lexer {
 
 // Fetches the next token from the input
 // Returns an error if no valid token was found
-func (lex *Lexer) PeekToken() (*Token, error) {
+func (lex *lexer) peekToken() (*token, error) {
 	// By default, token is EOF with a position one past the end of the input
-	token := &Token{kind: tokenEOF, pos: len(lex.input)}
+	token := &token{kind: tokenEOF, pos: len(lex.input)}
 
 	if lex.pos >= len(lex.input) {
 		// Reached the end of the input
@@ -125,8 +120,8 @@ func (lex *Lexer) PeekToken() (*Token, error) {
 }
 
 // Fetch/peek the next token in the input, then advance the lexer position
-func (lex *Lexer) NextToken() (*Token, error) {
-	token, err := lex.PeekToken()
+func (lex *lexer) nextToken() (*token, error) {
+	token, err := lex.peekToken()
 	if err != nil {
 		return token, err
 	}
@@ -139,7 +134,7 @@ func (lex *Lexer) NextToken() (*Token, error) {
 }
 
 // Reset the lexer to the start of the input
-func (lex *Lexer) Reset() {
+func (lex *lexer) Reset() {
 	lex.pos = 0
 	lex.numTokens = 0
 }

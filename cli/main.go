@@ -54,7 +54,7 @@ func buildCliApp() *cli.App {
 		&cli.IntFlag{
 			Name:    "interval",
 			Aliases: []string{"i"},
-			Value:   MIN_DAEMON_INTERVAL,
+			Value:   minDaemonInterval,
 			Usage:   "Interval at which to check for tweets, in `seconds`",
 		},
 	}
@@ -103,7 +103,7 @@ func buildCliApp() *cli.App {
 		&cli.IntFlag{
 			Name:    "interval",
 			Aliases: []string{"i"},
-			Value:   MIN_DAEMON_INTERVAL,
+			Value:   minDaemonInterval,
 			Usage:   "Interval at which to check for tweets, in `seconds`",
 		},
 	}

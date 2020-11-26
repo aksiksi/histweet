@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	MAX_TIMELINE_TWEETS = 3200
+	maxTimelineTweets = 3200
 )
 
+// Tweet represents a single Twitter tweet
 type Tweet struct {
 	ID          int64
 	CreatedAt   time.Time
@@ -24,7 +25,7 @@ type Tweet struct {
 	IsReply     bool
 }
 
-// Returns true if this tweet matches all set fields in the given rule.
+// IsMatch returns true if this tweet matches all set fields in the given rule.
 func (tweet *Tweet) IsMatch(rule *RuleTweet) bool {
 	if rule == nil {
 		return false
@@ -61,7 +62,7 @@ func (tweet *Tweet) IsMatch(rule *RuleTweet) bool {
 }
 
 // Convert an API tweet to internal tweet struct
-func convertApiTweet(from *twitter.Tweet) Tweet {
+func convertAPITweet(from *twitter.Tweet) Tweet {
 	createdAt, _ := from.CreatedAtTime()
 
 	tweet := Tweet{
@@ -77,6 +78,8 @@ func convertApiTweet(from *twitter.Tweet) Tweet {
 	return tweet
 }
 
+// NewTwitterClient is a helper that builds a Twitter client using
+// provided info.
 func NewTwitterClient(
 	consumerKey string,
 	consumerSecret string,
@@ -105,20 +108,22 @@ func NewTwitterClient(
 	return client, nil
 }
 
-// Fetch all timeline tweets for a given user based on the provided `Rule`.
+// FetchTimelineTweets collects all timeline tweets for a given user that match
+// the provided `Rule`.
+//
 // This function sequentially calls the Twitter user timeline API without any
 // throttling.
 func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 	// TODO: Handle throttling gracefully here
 	validCount := 0
 	totalCount := 0
-	tweets := make([]Tweet, 0, MAX_TIMELINE_TWEETS)
-	var maxID int64 = 0
+	tweets := make([]Tweet, 0, maxTimelineTweets)
+	var maxID int64
 
 	timelineParams := &twitter.UserTimelineParams{}
 
 	for {
-		if totalCount == MAX_TIMELINE_TWEETS {
+		if totalCount == maxTimelineTweets {
 			// We've hit the absolute max for this API, so stop here
 			break
 		}
@@ -144,14 +149,14 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 				}
 
 				for _, tweet := range returnedTweets[startIdx:] {
-					converted := convertApiTweet(&tweet)
+					converted := convertAPITweet(&tweet)
 					tweets = append(tweets, converted)
 				}
 			}
 		} else {
 			// Figure out if any of these tweets match the given rules
 			for _, tweet := range returnedTweets {
-				converted := convertApiTweet(&tweet)
+				converted := convertAPITweet(&tweet)
 
 				// Check for a match
 				match := rule.Tweet.IsMatch(&converted)
@@ -178,6 +183,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 	return tweets, nil
 }
 
+// DeleteTweets deletes the provided list of tweets
 func DeleteTweets(tweets []Tweet, client *twitter.Client) error {
 	// TODO: Handle throttling gracefully here
 	for _, tweet := range tweets {

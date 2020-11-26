@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	ARCHIVE_TIME_LAYOUT = "Mon Jan 02 15:04:05 -0700 2006"
-	ARCHIVE_SKIP_HEADER = "window.YTD.tweet.part0 = "
+	archiveTimeLayout = "Mon Jan 02 15:04:05 -0700 2006"
+	archiveSkipHeader = "window.YTD.tweet.part0 = "
 )
 
 // Relevant fields for a tweet in archive JSON format
@@ -29,7 +29,7 @@ type archiveEntry struct {
 // Convert an archive tweet to internal tweet struct
 func convertArchiveTweet(from *archiveTweet) Tweet {
 	tweetID, _ := strconv.ParseInt(from.IDStr, 10, 64)
-	createdAt, _ := time.Parse(ARCHIVE_TIME_LAYOUT, from.CreatedAt)
+	createdAt, _ := time.Parse(archiveTimeLayout, from.CreatedAt)
 	favoriteCount, _ := strconv.Atoi(from.FavoriteCountStr)
 	retweetCount, _ := strconv.Atoi(from.RetweetCountStr)
 
@@ -46,7 +46,9 @@ func convertArchiveTweet(from *archiveTweet) Tweet {
 	return tweet
 }
 
-// Fetch tweets from provided Twitter archive
+// FetchArchiveTweets parses all tweets in the provided Twitter archive and
+// checks them against the provided Rule. The output is a list of Tweets that
+// match the rule (i.e., to be deleted).
 func FetchArchiveTweets(rule *ParsedRule, archive string) ([]Tweet, error) {
 	var err error
 	var f *os.File
@@ -66,7 +68,7 @@ func FetchArchiveTweets(rule *ParsedRule, archive string) ([]Tweet, error) {
 	fileSize := info.Size()
 
 	// Skip some characters to get to valid JSON
-	numSkip := int64(len(ARCHIVE_SKIP_HEADER))
+	numSkip := int64(len(archiveSkipHeader))
 	_, err = f.Seek(numSkip, 0)
 	if err != nil {
 		return nil, err

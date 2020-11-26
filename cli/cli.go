@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	MIN_DAEMON_INTERVAL = 30
+	minDaemonInterval = 30
 )
 
-type Args struct {
+type args struct {
 	// Whether or not to run in daemon mode
 	Daemon   bool
 	Interval int
@@ -33,7 +33,7 @@ type Args struct {
 	Rule histweet.Rule
 }
 
-func runSingle(args *Args, client *twitter.Client) error {
+func runSingle(args *args, client *twitter.Client) error {
 	var tweets []histweet.Tweet
 	var err error
 
@@ -83,10 +83,10 @@ func runSingle(args *Args, client *twitter.Client) error {
 // Run the CLI in daemon mode
 // The CLI will continously poll the user's timeline and delete any tweets
 // that match the specified rules.
-func runDaemon(args *Args, client *twitter.Client) error {
+func runDaemon(args *args, client *twitter.Client) error {
 	interval := time.Duration(args.Interval)
-	if interval < MIN_DAEMON_INTERVAL {
-		return fmt.Errorf("The minimum daemon interal is %d", MIN_DAEMON_INTERVAL)
+	if interval < minDaemonInterval {
+		return fmt.Errorf("The minimum daemon interal is %d", minDaemonInterval)
 	}
 
 	ticker := time.NewTicker(interval * time.Second)
@@ -107,7 +107,7 @@ func runDaemon(args *Args, client *twitter.Client) error {
 	return nil
 }
 
-func run(args *Args) error {
+func run(args *args) error {
 	fmt.Println("\nRules")
 	fmt.Println("=====")
 
@@ -131,9 +131,9 @@ func run(args *Args) error {
 
 	if args.Daemon {
 		return runDaemon(args, client)
-	} else {
-		return runSingle(args, client)
 	}
+
+	return runSingle(args, client)
 }
 
 // Handles the CLI arguments and calls into the histweet lib to run the command
@@ -203,7 +203,7 @@ func handleCli(c *cli.Context) error {
 	}
 
 	// Build the args struct to run the command
-	args := &Args{
+	args := &args{
 		Daemon:         daemon,
 		Interval:       interval,
 		NoPrompt:       noPrompt,

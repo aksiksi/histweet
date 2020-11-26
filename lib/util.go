@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-// Given an age string, converts it into a time-based rule (`RuleTime`)
-func ConvertAgeToTime(age string) (time.Time, error) {
+func convertAgeToTime(age string) (time.Time, error) {
 	var days int
 	var months int
 	var years int
