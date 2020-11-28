@@ -18,22 +18,20 @@ func TestParser(t *testing.T) {
 	}
 
 	for _, input := range inputs {
-		parser := NewParser(input.input)
-
 		t.Run(input.input, func(t *testing.T) {
-			_, err := parser.Parse()
+			rule, err := Parse(input.input)
 			if err != nil {
 				t.Errorf("Failed to parse: %s", err)
 			}
 
-			numNodes := parser.rule.numNodes
+			numNodes := rule.numNodes
 			expected := input.numNodes
 
 			if numNodes != expected {
 				t.Errorf("Parsed not count %d != expected %d\n", numNodes, expected)
 			}
 
-			s := parser.rule.ToString()
+			s := rule.ToString()
 			if s == "" {
 				t.Errorf("No string returned\n")
 			}

@@ -33,7 +33,17 @@ var Tokens = map[tokenKind]string{
 	tokenNotIn:  "!~",
 }
 
-// ParseNode represents a single node in the parse tree.
+type nodeKind int
+
+// Types of parser nodes
+const (
+	nodeRoot nodeKind = iota
+	nodeCond
+	nodeLogical
+	nodeExpr
+)
+
+// parseNode represents a single node in the parse tree.
 //
 // Each node has a kind, which is one of: "expr", "logical", or "cond".
 // Logical nodes indicate that the node's two children are connected by a
@@ -45,31 +55,31 @@ var Tokens = map[tokenKind]string{
 //
 // Parsers can only be used once; to re-use a parser, make sure to call the
 // Reset() method.
-type ParseNode struct {
-	kind        string
+type parseNode struct {
+	kind        nodeKind
 	op          tokenKind
 	rule        *RuleTweet
-	children    []*ParseNode
+	children    []*parseNode
 	numChildren int
 }
 
-func (node *ParseNode) String() string {
-	return fmt.Sprintf("Kind: %s, Op: %d, NumChildren: %d, Rule: %+v",
+func (node *parseNode) String() string {
+	return fmt.Sprintf("Kind: %d, Op: %d, NumChildren: %d, Rule: %+v",
 		node.kind, node.op, node.numChildren, node.rule)
 }
 
-// ParsedRule represents a single parsed Rule as a tree of ParseNodes.
+// ParsedRule represents a single parsed Rule as a tree of parseNodes.
 type ParsedRule struct {
-	root     *ParseNode
+	root     *parseNode
 	input    string
 	numNodes int
 }
 
 func newParsedRule(input string) *ParsedRule {
-	root := &ParseNode{
-		children:    make([]*ParseNode, 0, 100),
+	root := &parseNode{
+		children:    make([]*parseNode, 0, 100),
 		numChildren: 0,
-		kind:        "root",
+		kind:        nodeRoot,
 		rule:        nil,
 	}
 
@@ -80,10 +90,10 @@ func newParsedRule(input string) *ParsedRule {
 	}
 }
 
-func evalInternal(tweet *Tweet, node *ParseNode) bool {
-	if node.kind == "cond" {
+func evalInternal(tweet *Tweet, node *parseNode) bool {
+	if node.kind == nodeCond {
 		return tweet.IsMatch(node.rule)
-	} else if node.kind == "logical" {
+	} else if node.kind == nodeLogical {
 		left := evalInternal(tweet, node.children[0])
 		right := evalInternal(tweet, node.children[1])
 
@@ -154,18 +164,19 @@ type Parser struct {
 
 // ParserError represents errors hit during rule parsing
 type ParserError struct {
-	msg   string
-	token *token
+	msg string
+	pos int
+	// TODO: Add line
 }
 
 func (err *ParserError) Error() string {
-	return fmt.Sprintf("Parser Error: %s (col %d)", err.msg, err.token.pos)
+	return fmt.Sprintf("Parser Error: %s (col %d)", err.msg, err.pos)
 }
 
 func newParserError(msg string, token *token) *ParserError {
 	return &ParserError{
-		msg:   msg,
-		token: token,
+		msg: msg,
+		pos: token.pos,
 	}
 }
 
@@ -188,10 +199,10 @@ func (parser *Parser) match(kind tokenKind) (*token, error) {
 	return currToken, nil
 }
 
-func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
+func (parser *Parser) expr(parent *parseNode) (*parseNode, error) {
 	var token *token
 	var err error
-	var node, logicalNode *ParseNode
+	var node, logicalNode *parseNode
 
 	if parser.currToken.kind == tokenLparen {
 		_, err = parser.match(tokenLparen)
@@ -201,10 +212,10 @@ func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
 
 		// For an expression, we know that this a non-terminal node,
 		// so we construct a new "parent" for the expr here
-		node = &ParseNode{
-			children:    make([]*ParseNode, 0, 100),
+		node = &parseNode{
+			children:    make([]*parseNode, 0, 100),
 			numChildren: 0,
-			kind:        "expr",
+			kind:        nodeExpr,
 			rule:        nil,
 		}
 
@@ -230,10 +241,10 @@ func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
 	if token != nil {
 		// Logical found (TODO)
 		// Build a logical node and make it the new "parent" for the node
-		logicalNode = &ParseNode{
-			children:    make([]*ParseNode, 0, 2),
+		logicalNode = &parseNode{
+			children:    make([]*parseNode, 0, 2),
 			numChildren: 0,
-			kind:        "logical",
+			kind:        nodeLogical,
 			op:          token.kind,
 			rule:        nil,
 		}
@@ -260,7 +271,7 @@ func (parser *Parser) expr(parent *ParseNode) (*ParseNode, error) {
 	return parent, nil
 }
 
-func (parser *Parser) cond() (*ParseNode, error) {
+func (parser *Parser) cond() (*parseNode, error) {
 	ident, err := parser.ident()
 	if err != nil {
 		return nil, err
@@ -365,8 +376,8 @@ func (parser *Parser) cond() (*ParseNode, error) {
 		return nil, newParserError(msg, op)
 	}
 
-	node := &ParseNode{
-		kind:     "cond",
+	node := &parseNode{
+		kind:     nodeCond,
 		rule:     rule,
 		op:       op.kind,
 		children: nil,
@@ -435,7 +446,7 @@ func (parser *Parser) literal() (*token, error) {
 	return token, nil
 }
 
-func toStringHelper(p *ParseNode, depth int, output *strings.Builder) {
+func toStringHelper(p *parseNode, depth int, output *strings.Builder) {
 	if p.numChildren == 0 {
 		return
 	}
@@ -483,4 +494,17 @@ func (parser *Parser) Parse() (*ParsedRule, error) {
 	_, err1 := parser.expr(parser.rule.root)
 
 	return parser.rule, err1
+}
+
+// Parse is the entry point to the rule parser infra.
+// Users of the library should only be using this function.
+func Parse(input string) (*ParsedRule, error) {
+	parser := NewParser(input)
+
+	rule, err := parser.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	return rule, nil
 }
