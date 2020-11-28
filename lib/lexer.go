@@ -124,10 +124,21 @@ func (lex *lexer) peekToken() (*token, error) {
 	matchPos := []int{math.MaxInt32, 0}
 	matchType := tokenEOF
 
+	// Consume any whitespace characters in the input
+	for {
+		if lex.input[lex.pos] != ' ' {
+			break
+		}
+
+		lex.pos++
+	}
+
 	// Iterate over each pattern and find the closest match
 	// TODO: Can we improve this?
 	for k, v := range lex.patterns {
-		// Check for a match
+		// Check for a match from the _start_ of the current
+		// position in the stream. We enforce this by having
+		// all token regexes start with "^".
 		location := v.FindStringIndex(lex.input[lex.pos:])
 		if location == nil {
 			continue

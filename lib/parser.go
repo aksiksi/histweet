@@ -13,24 +13,28 @@ const (
 )
 
 // Tokens for terminals of the Twitter rule parser grammar
+//
+// All token regular expressions _must_ start with ^ to ensure
+// that the match is computed from the current position in the
+// stream.
 var Tokens = map[tokenKind]string{
-	tokenIdent:  "[a-zA-Z_]+",
-	tokenNumber: "[0-9]+",
-	tokenString: `"[^\"]*"`,
+	tokenIdent:  "^[a-zA-Z_]+",
+	tokenNumber: "^[0-9]+",
+	tokenString: `^"[^\"]*"`,
 	tokenAge:    `^\s*([0-9]+[ymd])?([0-9]+[ymd])?([0-9]+[ymd])`,
-	tokenTime:   `\d\d-\w\w\w-\d\d\d\d`,
-	tokenLparen: `\(`,
-	tokenRparen: `\)`,
-	tokenOr:     `\|\|`,
-	tokenAnd:    "&&",
-	tokenGte:    ">=",
-	tokenGt:     ">",
-	tokenLte:    "<=",
-	tokenLt:     "<",
-	tokenEq:     "==",
-	tokenNeq:    "!=",
-	tokenIn:     "~",
-	tokenNotIn:  "!~",
+	tokenTime:   `^\d\d-\w\w\w-\d\d\d\d`,
+	tokenLparen: `^\(`,
+	tokenRparen: `^\)`,
+	tokenOr:     `^\|\|`,
+	tokenAnd:    "^&&",
+	tokenGte:    "^>=",
+	tokenGt:     "^>",
+	tokenLte:    "^<=",
+	tokenLt:     "^<",
+	tokenEq:     "^==",
+	tokenNeq:    "^!=",
+	tokenIn:     "^~",
+	tokenNotIn:  "^!~",
 }
 
 type nodeKind int
@@ -313,6 +317,10 @@ func (parser *Parser) cond() (*parseNode, error) {
 			return nil, newParserError("Invalid operator for \"age\"", op)
 		}
 	case "text":
+		if literal.kind != tokenString {
+			return nil, newParserError("Invalid literal for \"text\"", literal)
+		}
+
 		switch op.kind {
 		case tokenIn, tokenNotIn:
 			rule.Match = regexp.MustCompile(literal.val)
@@ -321,12 +329,12 @@ func (parser *Parser) cond() (*parseNode, error) {
 		}
 	case "created":
 		if literal.kind != tokenTime {
-			return nil, newParserError("Invalid literal for \"created\"", op)
+			return nil, newParserError("Invalid literal for \"created\"", literal)
 		}
 
 		time, err4 := time.Parse(timeLayout, literal.val)
 		if err4 != nil {
-			return nil, newParserError("Invalid time format for \"created\"", op)
+			return nil, newParserError("Invalid time format for \"created\"", literal)
 		}
 
 		switch op.kind {
@@ -342,7 +350,7 @@ func (parser *Parser) cond() (*parseNode, error) {
 		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
-				return nil, newParserError("Invalid number for \"likes\"", op)
+				return nil, newParserError("Invalid number for \"likes\"", literal)
 			}
 
 			// TODO
@@ -355,7 +363,7 @@ func (parser *Parser) cond() (*parseNode, error) {
 		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
-				return nil, newParserError("Invalid number for \"retweets\"", op)
+				return nil, newParserError("Invalid number for \"retweets\"", literal)
 			}
 
 			// TODO
@@ -364,7 +372,7 @@ func (parser *Parser) cond() (*parseNode, error) {
 			return nil, newParserError("Invalid operator for \"retweets\"", op)
 		}
 	default:
-		return nil, newParserError("Invalid identifier", op)
+		return nil, newParserError("Invalid identifier", ident)
 	}
 
 	node := &parseNode{
