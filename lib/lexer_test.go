@@ -67,9 +67,9 @@ func TestLexer(t *testing.T) {
 	}
 
 	for input, expected := range tests {
-		lexer := newLexer(TOKENS, input)
-
 		t.Run(input, func(t *testing.T) {
+			lexer := newLexer(Tokens, input)
+
 			for i := 0; i < len(expected); i++ {
 				token, err := lexer.nextToken()
 				if err != nil {
@@ -87,6 +87,11 @@ func TestLexer(t *testing.T) {
 					t.Errorf("Invalid value - found: %s != expected: %s",
 						token.val, currExpected.val)
 				}
+			}
+
+			lexer.Reset()
+			if lexer.pos != 0 || lexer.numTokens != 0 {
+				t.Errorf("Lexer not reset properly")
 			}
 		})
 	}

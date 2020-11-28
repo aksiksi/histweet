@@ -32,6 +32,11 @@ func TestParser(t *testing.T) {
 			if numNodes != expected {
 				t.Errorf("Parsed not count %d != expected %d\n", numNodes, expected)
 			}
+
+			s := parser.rule.ToString()
+			if s == "" {
+				t.Errorf("No string returned\n")
+			}
 		})
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aksiksi/histweet/lib"
+	histweet "github.com/aksiksi/histweet/lib"
 )
 
 func ruleHandler(w http.ResponseWriter, r *http.Request) {

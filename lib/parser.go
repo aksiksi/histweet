@@ -12,8 +12,8 @@ const (
 	timeLayout = "02-Jan-2006"
 )
 
-// TOKENS for terminals of the Twitter rule parser grammar
-var TOKENS = map[tokenKind]string{
+// Tokens for terminals of the Twitter rule parser grammar
+var Tokens = map[tokenKind]string{
 	tokenIdent:  "[a-zA-Z_]+",
 	tokenNumber: "[0-9]+",
 	tokenString: `"[^\"]*"`,
@@ -455,7 +455,7 @@ func (rule *ParsedRule) ToString() string {
 
 // NewParser builds a new Parser from the input
 func NewParser(input string) *Parser {
-	lexer := newLexer(TOKENS, input)
+	lexer := newLexer(Tokens, input)
 
 	parser := &Parser{
 		lexer: lexer,
@@ -467,7 +467,7 @@ func NewParser(input string) *Parser {
 
 // Reset this Parser to a clean state with the provided input
 func (parser *Parser) Reset(input string) {
-	parser.lexer = newLexer(TOKENS, input)
+	parser.lexer = newLexer(Tokens, input)
 	parser.rule = newParsedRule(input)
 }
 

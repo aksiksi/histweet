@@ -9,7 +9,7 @@ import (
 
 	"github.com/dghubble/go-twitter/twitter"
 
-	"github.com/aksiksi/histweet/lib"
+	histweet "github.com/aksiksi/histweet/lib"
 )
 
 const (
@@ -103,8 +103,6 @@ func runDaemon(args *args, client *twitter.Client) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func run(args *args) error {
