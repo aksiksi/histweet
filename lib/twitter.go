@@ -158,8 +158,10 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 			for _, tweet := range returnedTweets {
 				converted := convertAPITweet(&tweet)
 
-				// Check for a match
-				match := rule.Tweet.IsMatch(&converted)
+				// Evaluate the tweet against the parsed rule.
+				// This walks the entire parse tree and ensures that all rules
+				// match.
+				match := rule.Tweet.Eval(&converted)
 
 				if match {
 					tweets = append(tweets, converted)

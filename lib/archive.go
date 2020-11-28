@@ -99,7 +99,7 @@ func FetchArchiveTweets(rule *ParsedRule, archive string) ([]Tweet, error) {
 
 		// If the tweet matches the provided rule, append it to the tweet
 		// list
-		if rule.IsMatch(&tweet) {
+		if rule.Eval(&tweet) {
 			tweets = append(tweets, tweet)
 		}
 	}

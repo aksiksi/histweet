@@ -111,11 +111,10 @@ func evalInternal(tweet *Tweet, node *parseNode) bool {
 	}
 }
 
-// IsMatch walks the parse tree and evaluates each condition against
+// Eval walks the parse tree and evaluates each condition against
 // the given Tweet. Returns true if the Tweet matches all of the rules.
-func (rule *ParsedRule) IsMatch(tweet *Tweet) bool {
-	root := rule.root
-	return evalInternal(tweet, root)
+func (rule *ParsedRule) Eval(tweet *Tweet) bool {
+	return evalInternal(tweet, rule.root)
 }
 
 // Parser is a simple parser for tweet deletion rule strings.
