@@ -163,19 +163,23 @@ type Parser struct {
 
 // ParserError represents errors hit during rule parsing
 type ParserError struct {
-	msg string
-	pos int
+	msg  string
+	pos  int
+	kind tokenKind
+	val  string
 	// TODO: Add line
 }
 
 func (err *ParserError) Error() string {
-	return fmt.Sprintf("Parser Error: %s (col %d)", err.msg, err.pos)
+	return fmt.Sprintf("%s: \"%s\" (%s) (at col %d)", err.msg, err.val, err.kind.ToString(), err.pos)
 }
 
 func newParserError(msg string, token *token) *ParserError {
 	return &ParserError{
-		msg: msg,
-		pos: token.pos,
+		msg:  msg,
+		pos:  token.pos,
+		kind: token.kind,
+		val:  token.val,
 	}
 }
 
@@ -292,14 +296,12 @@ func (parser *Parser) cond() (*parseNode, error) {
 	switch ident.val {
 	case "age":
 		if literal.kind != tokenAge {
-			msg := fmt.Sprintf("Invalid literal for \"age\": %s", literal.val)
-			return nil, newParserError(msg, literal)
+			return nil, newParserError("Invalid literal for \"age\"", literal)
 		}
 
 		time, err3 := convertAgeToTime(literal.val)
 		if err3 != nil {
-			msg := fmt.Sprintf("Invalid format for \"age\": %s", literal.val)
-			return nil, newParserError(msg, literal)
+			return nil, newParserError("Invalid format for \"age\"", literal)
 		}
 
 		switch op.kind {
@@ -308,27 +310,23 @@ func (parser *Parser) cond() (*parseNode, error) {
 		case tokenLt, tokenLte:
 			rule.After = time
 		default:
-			msg := fmt.Sprintf("Invalid operator for \"age\": %s", op.val)
-			return nil, newParserError(msg, op)
+			return nil, newParserError("Invalid operator for \"age\"", op)
 		}
 	case "text":
 		switch op.kind {
 		case tokenIn, tokenNotIn:
 			rule.Match = regexp.MustCompile(literal.val)
 		default:
-			msg := fmt.Sprintf("Invalid operator for \"text\": %s", op.val)
-			return nil, newParserError(msg, op)
+			return nil, newParserError("Invalid operator for \"text\"", op)
 		}
 	case "created":
 		if literal.kind != tokenTime {
-			msg := fmt.Sprintf("Invalid literal for \"created\": %s", literal.val)
-			return nil, newParserError(msg, literal)
+			return nil, newParserError("Invalid literal for \"created\"", op)
 		}
 
 		time, err4 := time.Parse(timeLayout, literal.val)
 		if err4 != nil {
-			msg := fmt.Sprintf("Invalid format for time for \"created\": %s", literal.val)
-			return nil, newParserError(msg, literal)
+			return nil, newParserError("Invalid time format for \"created\"", op)
 		}
 
 		switch op.kind {
@@ -337,42 +335,36 @@ func (parser *Parser) cond() (*parseNode, error) {
 		case tokenLt, tokenLte:
 			rule.After = time
 		default:
-			msg := fmt.Sprintf("Invalid operator for \"created\": %s", op.val)
-			return nil, newParserError(msg, op)
+			return nil, newParserError("Invalid operator for \"created\"", op)
 		}
 	case "likes":
 		switch op.kind {
 		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
-				msg := fmt.Sprintf("Invalid number for \"likes\": %s", literal.val)
-				return nil, newParserError(msg, literal)
+				return nil, newParserError("Invalid number for \"likes\"", op)
 			}
 
 			// TODO
 			rule.MaxLikes = num
 		default:
-			msg := fmt.Sprintf("Invalid operator for \"likes\": %s", op.val)
-			return nil, newParserError(msg, op)
+			return nil, newParserError("Invalid operator for \"likes\"", op)
 		}
 	case "reweets":
 		switch op.kind {
 		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
 			if err != nil {
-				msg := fmt.Sprintf("Invalid number for \"reweets\": %s", literal.val)
-				return nil, newParserError(msg, literal)
+				return nil, newParserError("Invalid number for \"retweets\"", op)
 			}
 
 			// TODO
 			rule.MaxRetweets = num
 		default:
-			msg := fmt.Sprintf("Invalid operator for \"reweets\": %s", op.val)
-			return nil, newParserError(msg, op)
+			return nil, newParserError("Invalid operator for \"retweets\"", op)
 		}
 	default:
-		msg := fmt.Sprintf("Invalid identifier: %s", ident.val)
-		return nil, newParserError(msg, op)
+		return nil, newParserError("Invalid identifier", op)
 	}
 
 	node := &parseNode{
@@ -395,54 +387,51 @@ func (parser *Parser) ident() (*token, error) {
 }
 
 func (parser *Parser) logical() (*token, error) {
-	var token *token
-	var err error
+	token := parser.currToken
 
-	switch parser.currToken.kind {
+	switch token.kind {
 	case tokenAnd, tokenOr:
-		token, err = parser.match(parser.currToken.kind)
+		token, err := parser.match(token.kind)
 		if err != nil {
 			return nil, err
 		}
-	default:
-		return nil, fmt.Errorf("Invalid logical operator")
-	}
 
-	return token, nil
+		return token, nil
+	default:
+		return nil, newParserError("Invalid operator for logical expression", token)
+	}
 }
 
 func (parser *Parser) op() (*token, error) {
-	var token *token
-	var err error
+	token := parser.currToken
 
-	switch parser.currToken.kind {
+	switch token.kind {
 	case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq, tokenIn, tokenNotIn:
-		token, err = parser.match(parser.currToken.kind)
+		token, err := parser.match(parser.currToken.kind)
 		if err != nil {
 			return nil, err
 		}
-	default:
-		return nil, fmt.Errorf("Invalid comparison operator")
-	}
 
-	return token, nil
+		return token, nil
+	default:
+		return nil, newParserError("Invalid comparison operator", token)
+	}
 }
 
 func (parser *Parser) literal() (*token, error) {
-	var token *token
-	var err error
+	token := parser.currToken
 
-	switch parser.currToken.kind {
+	switch token.kind {
 	case tokenString, tokenNumber, tokenAge, tokenTime:
-		token, err = parser.match(parser.currToken.kind)
+		token, err := parser.match(token.kind)
 		if err != nil {
 			return nil, err
 		}
-	default:
-		return nil, fmt.Errorf("Invalid literal")
-	}
 
-	return token, nil
+		return token, nil
+	default:
+		return nil, newParserError("Invalid literal", token)
+	}
 }
 
 func toStringHelper(p *parseNode, depth int, output *strings.Builder) {

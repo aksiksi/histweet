@@ -38,6 +38,49 @@ const (
 	tokenEOF
 )
 
+func (t tokenKind) ToString() string {
+	switch t {
+	case tokenIdent:
+		return "identifier"
+	case tokenNumber:
+		return "number"
+	case tokenString:
+		return "string"
+	case tokenAge:
+		return "age"
+	case tokenTime:
+		return "time"
+	case tokenLparen:
+		return "left paren"
+	case tokenRparen:
+		return "right paren"
+	case tokenOr:
+		return "or"
+	case tokenAnd:
+		return "and"
+	case tokenGte:
+		return "greater or equal"
+	case tokenGt:
+		return "greater"
+	case tokenLte:
+		return "less or equal"
+	case tokenLt:
+		return "less"
+	case tokenEq:
+		return "equal"
+	case tokenNeq:
+		return "not equal"
+	case tokenIn:
+		return "in"
+	case tokenNotIn:
+		return "not in"
+	case tokenEOF:
+		return "eof"
+	default:
+		return "unknown"
+	}
+}
+
 type token struct {
 	kind tokenKind
 	val  string
