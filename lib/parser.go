@@ -346,6 +346,10 @@ func (parser *Parser) cond() (*parseNode, error) {
 			return nil, newParserError("Invalid operator for \"created\"", op)
 		}
 	case "likes":
+		if literal.kind != tokenNumber {
+			return nil, newParserError("Invalid literal for \"likes\"", literal)
+		}
+
 		switch op.kind {
 		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)
@@ -358,7 +362,11 @@ func (parser *Parser) cond() (*parseNode, error) {
 		default:
 			return nil, newParserError("Invalid operator for \"likes\"", op)
 		}
-	case "reweets":
+	case "retweets":
+		if literal.kind != tokenNumber {
+			return nil, newParserError("Invalid literal for \"retweets\"", literal)
+		}
+
 		switch op.kind {
 		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
 			num, err := strconv.Atoi(literal.val)

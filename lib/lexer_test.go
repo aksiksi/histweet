@@ -64,6 +64,19 @@ func TestLexer(t *testing.T) {
 			token{kind: tokenNotIn, val: "!~"},
 			token{kind: tokenString, val: `"xyz"`},
 		},
+
+		// Invalid tokens
+		"age > 3m ** (likes < 100 && likes == 34)": {
+			token{kind: tokenIdent, val: "age"},
+			token{kind: tokenGt, val: ">"},
+			token{kind: tokenAge, val: "3m"},
+			token{kind: tokenEOF, val: "**"},
+		},
+		"-++": {
+			token{kind: tokenEOF, val: "-"},
+			token{kind: tokenEOF, val: "+"},
+			token{kind: tokenEOF, val: "+"},
+		},
 	}
 
 	for input, expected := range tests {
@@ -71,12 +84,18 @@ func TestLexer(t *testing.T) {
 			lexer := newLexer(Tokens, input)
 
 			for i := 0; i < len(expected); i++ {
+				currExpected := &expected[i]
+
 				token, err := lexer.nextToken()
 				if err != nil {
-					t.Errorf("Error: %s", err)
+					if currExpected.kind == tokenEOF {
+						// Failed as expected
+						t.Log("Found invalid token: ", currExpected)
+						continue
+					} else {
+						t.Errorf("Error: %s", err)
+					}
 				}
-
-				currExpected := &expected[i]
 
 				if token.kind != currExpected.kind {
 					t.Errorf("Invalid kind - found: %d != expected: %d",
