@@ -323,7 +323,10 @@ func (parser *Parser) cond() (*parseNode, error) {
 
 		switch op.kind {
 		case tokenIn, tokenNotIn:
-			rule.Match = regexp.MustCompile(literal.val)
+			// Gotcha: the literal contains quotes - remove them before building the regexp
+			pat := strings.Replace(literal.val, "\"", "", 2)
+
+			rule.Match = regexp.MustCompile(pat)
 		default:
 			return nil, newParserError("Invalid operator for \"text\"", op)
 		}
@@ -350,15 +353,26 @@ func (parser *Parser) cond() (*parseNode, error) {
 			return nil, newParserError("Invalid literal for \"likes\"", literal)
 		}
 
-		switch op.kind {
-		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
-			num, err := strconv.Atoi(literal.val)
-			if err != nil {
-				return nil, newParserError("Invalid number for \"likes\"", literal)
-			}
+		num, err := strconv.Atoi(literal.val)
+		if err != nil {
+			return nil, newParserError("Invalid number for \"likes\"", literal)
+		}
 
-			// TODO
-			rule.MaxLikes = num
+		rule.Likes = num
+
+		switch op.kind {
+		case tokenGt:
+			rule.LikesComparator = comparatorGt
+		case tokenGte:
+			rule.LikesComparator = comparatorGte
+		case tokenLt:
+			rule.LikesComparator = comparatorLt
+		case tokenLte:
+			rule.LikesComparator = comparatorLte
+		case tokenEq:
+			rule.LikesComparator = comparatorEq
+		case tokenNeq:
+			rule.LikesComparator = comparatorNeq
 		default:
 			return nil, newParserError("Invalid operator for \"likes\"", op)
 		}
@@ -367,15 +381,26 @@ func (parser *Parser) cond() (*parseNode, error) {
 			return nil, newParserError("Invalid literal for \"retweets\"", literal)
 		}
 
-		switch op.kind {
-		case tokenLt, tokenLte, tokenGt, tokenGte, tokenEq, tokenNeq:
-			num, err := strconv.Atoi(literal.val)
-			if err != nil {
-				return nil, newParserError("Invalid number for \"retweets\"", literal)
-			}
+		num, err := strconv.Atoi(literal.val)
+		if err != nil {
+			return nil, newParserError("Invalid number for \"retweets\"", literal)
+		}
 
-			// TODO
-			rule.MaxRetweets = num
+		rule.Retweets = num
+
+		switch op.kind {
+		case tokenGt:
+			rule.RetweetsComparator = comparatorGt
+		case tokenGte:
+			rule.RetweetsComparator = comparatorGte
+		case tokenLt:
+			rule.RetweetsComparator = comparatorLt
+		case tokenLte:
+			rule.RetweetsComparator = comparatorLte
+		case tokenEq:
+			rule.RetweetsComparator = comparatorEq
+		case tokenNeq:
+			rule.RetweetsComparator = comparatorNeq
 		default:
 			return nil, newParserError("Invalid operator for \"retweets\"", op)
 		}

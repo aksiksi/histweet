@@ -2,7 +2,7 @@ package histweet
 
 import (
 	"fmt"
-	"strings"
+	"net/http"
 	"time"
 
 	"github.com/dghubble/go-twitter/twitter"
@@ -25,6 +25,46 @@ type Tweet struct {
 	IsReply     bool
 }
 
+// Interfaces that wrap the required Twitter API services.
+// Defining and using these interfaces allows us to easily mock
+// the Twitter client in our tests.
+type twitterAccountService interface {
+	VerifyCredentials(params *twitter.AccountVerifyParams) (*twitter.User, *http.Response, error)
+}
+
+type twitterTimelineService interface {
+	UserTimeline(params *twitter.UserTimelineParams) ([]twitter.Tweet, *http.Response, error)
+}
+
+type twitterStatusService interface {
+	Destroy(id int64, params *twitter.StatusDestroyParams) (*twitter.Tweet, *http.Response, error)
+}
+
+// This interface wraps the Twitter client APIs that we use
+type twitterClientAPI interface {
+	accountService() twitterAccountService
+	timelineService() twitterTimelineService
+	statusService() twitterStatusService
+}
+
+// This is the actual implementation of twitterClientAPI
+// Notice that it simply wraps the external Twitter API client
+type twitterClient struct {
+	client *twitter.Client
+}
+
+func (t *twitterClient) accountService() twitterAccountService {
+	return t.client.Accounts
+}
+
+func (t *twitterClient) timelineService() twitterTimelineService {
+	return t.client.Timelines
+}
+
+func (t *twitterClient) statusService() twitterStatusService {
+	return t.client.Statuses
+}
+
 // IsMatch returns true if this tweet matches all set fields in the given rule.
 func (tweet *Tweet) IsMatch(rule *RuleTweet) bool {
 	if rule == nil {
@@ -42,20 +82,50 @@ func (tweet *Tweet) IsMatch(rule *RuleTweet) bool {
 		isMatch = isMatch && createdAt.After(rule.Before)
 	}
 
-	if rule.Contains != "" {
-		isMatch = isMatch && strings.Contains(tweet.Text, rule.Contains)
-	}
-
 	if rule.Match != nil {
 		isMatch = isMatch && (rule.Match.FindStringIndex(tweet.Text) != nil)
 	}
 
-	if rule.MaxLikes > 0 {
-		isMatch = isMatch && (tweet.NumLikes < rule.MaxLikes)
+	if rule.Likes > 0 {
+		match := false
+
+		switch rule.LikesComparator {
+		case comparatorGt:
+			match = tweet.NumLikes > rule.Likes
+		case comparatorGte:
+			match = tweet.NumLikes >= rule.Likes
+		case comparatorLt:
+			match = tweet.NumLikes < rule.Likes
+		case comparatorLte:
+			match = tweet.NumLikes <= rule.Likes
+		case comparatorEq:
+			match = tweet.NumLikes == rule.Likes
+		case comparatorNeq:
+			match = tweet.NumLikes != rule.Likes
+		}
+
+		isMatch = isMatch && match
 	}
 
-	if rule.MaxRetweets > 0 {
-		isMatch = isMatch && (tweet.NumRetweets < rule.MaxRetweets)
+	if rule.Retweets > 0 {
+		match := false
+
+		switch rule.RetweetsComparator {
+		case comparatorGt:
+			match = tweet.NumRetweets > rule.Retweets
+		case comparatorGte:
+			match = tweet.NumRetweets >= rule.Retweets
+		case comparatorLt:
+			match = tweet.NumRetweets < rule.Retweets
+		case comparatorLte:
+			match = tweet.NumRetweets <= rule.Retweets
+		case comparatorEq:
+			match = tweet.NumRetweets == rule.Retweets
+		case comparatorNeq:
+			match = tweet.NumRetweets != rule.Retweets
+		}
+
+		isMatch = isMatch && match
 	}
 
 	return isMatch
@@ -113,7 +183,7 @@ func NewTwitterClient(
 //
 // This function sequentially calls the Twitter user timeline API without any
 // throttling.
-func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
+func FetchTimelineTweets(rule *Rule, client twitterClientAPI) ([]Tweet, error) {
 	// TODO: Handle throttling gracefully here
 	validCount := 0
 	totalCount := 0
@@ -131,7 +201,7 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 		timelineParams.MaxID = maxID
 
 		// Fetch a set of tweets (max. 200)
-		returnedTweets, _, err := client.Timelines.UserTimeline(timelineParams)
+		returnedTweets, _, err := client.timelineService().UserTimeline(timelineParams)
 		if err != nil {
 			return nil, fmt.Errorf("Something went wrong while fetching timeline tweets: %s", err.Error())
 		}
@@ -186,10 +256,10 @@ func FetchTimelineTweets(rule *Rule, client *twitter.Client) ([]Tweet, error) {
 }
 
 // DeleteTweets deletes the provided list of tweets
-func DeleteTweets(tweets []Tweet, client *twitter.Client) error {
+func DeleteTweets(tweets []Tweet, client twitterClientAPI) error {
 	// TODO: Handle throttling gracefully here
 	for _, tweet := range tweets {
-		_, _, err := client.Statuses.Destroy(tweet.ID, &twitter.StatusDestroyParams{})
+		_, _, err := client.statusService().Destroy(tweet.ID, &twitter.StatusDestroyParams{})
 		if err != nil {
 			return err
 		}
