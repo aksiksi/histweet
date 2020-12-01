@@ -193,7 +193,8 @@ func (parser *Parser) match(kind tokenKind) (*token, error) {
 	currToken := parser.currToken
 
 	if currToken.kind != kind {
-		return nil, fmt.Errorf("Failed match for kind = %d", kind)
+		return nil, fmt.Errorf(`Unexpected token - found: "%s", expected: "%s"`,
+			currToken.kind.ToString(), kind.ToString())
 	}
 
 	token, err := parser.lexer.nextToken()
