@@ -10,10 +10,16 @@ func TestParser(t *testing.T) {
 		numNodes int
 	}{
 		// Valid
-		{"age > 3m && (likes < 100 && likes == 34)", 6},
-		{"(age > 3m && (likes < 100 && likes >= 34)) || text !~ \"xyz\"", 9},
+		{"likes == 34 && retweets == 2", 3},
+		{"likes != 34 && retweets != 2", 3},
+		{"likes >= 34 && retweets >= 2", 3},
+		{"likes <= 34 && retweets <= 2", 3},
+		{"likes > 34 && retweets > 2", 3},
+		{"likes < 34 && retweets < 2", 3},
+		{"age > 3m && likes < 100", 3},
+		{"(age > 3m && likes >= 34) || text !~ \"xyz\"", 6},
 		{"(age > 3m && (retweets < 100 && likes >= 34)) || text !~ \"xyz\"", 9},
-		{"(age < 5y3m2d && (likes < 100 && likes >= 34)) || text !~ \"xyz\"", 9},
+		{"(age < 5y3m2d && (likes < 100 && retweets != 34)) || text !~ \"xyz\"", 9},
 		{`((text !~ "hey!") && (likes == 5) && (likes == 3)) || ( likes == 9)`, 12},
 		{`((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`, 10},
 		{`((text !~ "hey!") && (likes == 5)) || created > 10-May-2020 || likes == 9`, 10},
@@ -30,6 +36,7 @@ func TestParser(t *testing.T) {
 		// Invalid identifiers
 		{`hummus !~ "hey!" && likes == 5`, -1},
 		{`text !~ "hey!" || hates == 5`, -1},
+		{"potatoes > 10", -1},
 
 		// Invalid operators
 		{"age - 3m && (likes < 100 && likes == 34)", -1},
@@ -39,8 +46,8 @@ func TestParser(t *testing.T) {
 		{`text < "abcd"`, -1},
 		{`created ~ 10-May-2020`, -1},
 
-		// Invalid identifier
-		{"potatoes > 10", -1},
+		// Unbalanced parens
+		{"(age > 3m && likes >= 34 || text !~ \"xyz\"", -1},
 	}
 
 	for _, input := range inputs {
