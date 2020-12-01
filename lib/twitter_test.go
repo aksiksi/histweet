@@ -46,7 +46,13 @@ func (t *mockTwitterClient) statusService() twitterStatusService {
 }
 
 func TestNewTwitterClient(t *testing.T) {
-	_, _ = NewTwitterClient("", "", "", "", false)
+	// The first call will fail due to bad OAuth creds, but we can ignore the error
+	_, _ = NewTwitterClient("", "", "", "", true)
+
+	_, err := NewTwitterClient("", "", "", "", false)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestTweetAPIs(t *testing.T) {

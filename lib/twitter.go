@@ -160,7 +160,9 @@ func NewTwitterClient(
 	config := oauth1.NewConfig(consumerKey, consumerSecret)
 	token := oauth1.NewToken(accessToken, accessSecret)
 	httpClient := config.Client(oauth1.NoContext, token)
-	client := twitter.NewClient(httpClient)
+
+	// Wrap the Twitter client with our own interface
+	client := &TwitterClient{Client: twitter.NewClient(httpClient)}
 
 	// Verify the user
 	if verify {
@@ -169,13 +171,13 @@ func NewTwitterClient(
 			IncludeEmail: twitter.Bool(true),
 		}
 
-		_, _, err := client.Accounts.VerifyCredentials(verifyParams)
+		_, _, err := client.accountService().VerifyCredentials(verifyParams)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid user credentials provided")
 		}
 	}
 
-	return &TwitterClient{Client: client}, nil
+	return client, nil
 }
 
 // FetchTimelineTweets collects all timeline tweets for a given user that match
