@@ -7,8 +7,6 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/dghubble/go-twitter/twitter"
-
 	histweet "github.com/aksiksi/histweet/lib"
 )
 
@@ -33,7 +31,7 @@ type args struct {
 	Rule histweet.Rule
 }
 
-func runSingle(args *args, client *twitter.Client) error {
+func runSingle(args *args, client *histweet.TwitterClient) error {
 	var tweets []histweet.Tweet
 	var err error
 
@@ -83,7 +81,7 @@ func runSingle(args *args, client *twitter.Client) error {
 // Run the CLI in daemon mode
 // The CLI will continously poll the user's timeline and delete any tweets
 // that match the specified rules.
-func runDaemon(args *args, client *twitter.Client) error {
+func runDaemon(args *args, client *histweet.TwitterClient) error {
 	interval := time.Duration(args.Interval)
 	if interval < minDaemonInterval {
 		return fmt.Errorf("The minimum daemon interal is %d", minDaemonInterval)

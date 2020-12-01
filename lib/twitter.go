@@ -47,22 +47,22 @@ type twitterClientAPI interface {
 	statusService() twitterStatusService
 }
 
-// This is the actual implementation of twitterClientAPI
+// TwitterClient is the actual implementation of twitterClientAPI
 // Notice that it simply wraps the external Twitter API client
-type twitterClient struct {
-	client *twitter.Client
+type TwitterClient struct {
+	Client *twitter.Client
 }
 
-func (t *twitterClient) accountService() twitterAccountService {
-	return t.client.Accounts
+func (t *TwitterClient) accountService() twitterAccountService {
+	return t.Client.Accounts
 }
 
-func (t *twitterClient) timelineService() twitterTimelineService {
-	return t.client.Timelines
+func (t *TwitterClient) timelineService() twitterTimelineService {
+	return t.Client.Timelines
 }
 
-func (t *twitterClient) statusService() twitterStatusService {
-	return t.client.Statuses
+func (t *TwitterClient) statusService() twitterStatusService {
+	return t.Client.Statuses
 }
 
 // IsMatch returns true if this tweet matches all set fields in the given rule.
@@ -155,7 +155,7 @@ func NewTwitterClient(
 	consumerSecret string,
 	accessToken string,
 	accessSecret string,
-	verify bool) (*twitter.Client, error) {
+	verify bool) (*TwitterClient, error) {
 	// Build the Twitter client
 	config := oauth1.NewConfig(consumerKey, consumerSecret)
 	token := oauth1.NewToken(accessToken, accessSecret)
@@ -175,7 +175,7 @@ func NewTwitterClient(
 		}
 	}
 
-	return client, nil
+	return &TwitterClient{Client: client}, nil
 }
 
 // FetchTimelineTweets collects all timeline tweets for a given user that match
