@@ -212,7 +212,9 @@ func (parser *Parser) expr(parent *parseNode) (*parseNode, error) {
 	var err error
 	var node, logicalNode *parseNode
 
-	if parser.currToken.kind == tokenLparen {
+	// Step 1: Is this ( expr ) or just a cond?
+	switch parser.currToken.kind {
+	case tokenLparen:
 		_, err = parser.match(tokenLparen)
 		if err != nil {
 			return nil, err
@@ -236,38 +238,45 @@ func (parser *Parser) expr(parent *parseNode) (*parseNode, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	case tokenIdent:
 		// Condition
 		node, err = parser.cond()
 		if err != nil {
 			return nil, err
 		}
+	default:
+		return nil, fmt.Errorf("Unexpected token")
 	}
 
-	// Improve this logic (TODO)
-	token, err = parser.logical()
-	if token != nil {
-		// Logical found (TODO)
-		// Build a logical node and make it the new "parent" for the node
-		logicalNode = &parseNode{
-			children:    make([]*parseNode, 0, 2),
-			numChildren: 0,
-			kind:        nodeLogical,
-			op:          token.kind,
-			rule:        nil,
+	// Step 2: Check if we are in the middle of a logical expression
+	switch parser.currToken.kind {
+	case tokenAnd, tokenOr:
+		token, err = parser.logical()
+		if token != nil {
+			// Logical found (TODO)
+			// Build a logical node and make it the new "parent" for the node
+			logicalNode = &parseNode{
+				children:    make([]*parseNode, 0, 2),
+				numChildren: 0,
+				kind:        nodeLogical,
+				op:          token.kind,
+				rule:        nil,
+			}
+
+			logicalNode.children = append(logicalNode.children, node)
+			logicalNode.numChildren++
+
+			parser.rule.numNodes++
+
+			_, err = parser.expr(logicalNode)
+			if err != nil {
+				return nil, err
+			}
+
+			node = logicalNode
 		}
-
-		logicalNode.children = append(logicalNode.children, node)
-		logicalNode.numChildren++
-
-		parser.rule.numNodes++
-
-		_, err = parser.expr(logicalNode)
-		if err != nil {
-			return nil, err
-		}
-
-		node = logicalNode
+	default:
+		break
 	}
 
 	// Insert this node into the current parent node
