@@ -41,10 +41,8 @@ type nodeKind int
 
 // Types of parser nodes
 const (
-	nodeRoot nodeKind = iota
-	nodeCond
+	nodeCond nodeKind = iota
 	nodeLogical
-	nodeExpr
 )
 
 // parseNode represents a single node in the parse tree.
@@ -60,16 +58,15 @@ const (
 // Parsers can only be used once; to re-use a parser, make sure to call the
 // Reset() method.
 type parseNode struct {
-	kind        nodeKind
-	op          tokenKind
-	rule        *RuleTweet
-	children    []*parseNode
-	numChildren int
+	kind  nodeKind
+	op    tokenKind
+	rule  *RuleTweet
+	left  *parseNode
+	right *parseNode
 }
 
 func (node *parseNode) String() string {
-	return fmt.Sprintf("Kind: %d, Op: %d, NumChildren: %d, Rule: %+v",
-		node.kind, node.op, node.numChildren, node.rule)
+	return fmt.Sprintf("Kind: %d, Op: %d, Rule: %+v", node.kind, node.op, node.rule)
 }
 
 // ParsedRule represents a single parsed Rule as a tree of parseNodes.
@@ -80,26 +77,20 @@ type ParsedRule struct {
 }
 
 func newParsedRule(input string) *ParsedRule {
-	root := &parseNode{
-		children:    make([]*parseNode, 0, 100),
-		numChildren: 0,
-		kind:        nodeRoot,
-		rule:        nil,
-	}
-
 	return &ParsedRule{
-		root:     root,
+		root:     nil,
 		input:    input,
 		numNodes: 0,
 	}
 }
 
 func evalInternal(tweet *Tweet, node *parseNode) bool {
-	if node.kind == nodeCond {
+	switch node.kind {
+	case nodeCond:
 		return tweet.IsMatch(node.rule)
-	} else if node.kind == nodeLogical {
-		left := evalInternal(tweet, node.children[0])
-		right := evalInternal(tweet, node.children[1])
+	case nodeLogical:
+		left := evalInternal(tweet, node.left)
+		right := evalInternal(tweet, node.right)
 
 		switch node.op {
 		case tokenAnd:
@@ -109,9 +100,8 @@ func evalInternal(tweet *Tweet, node *parseNode) bool {
 		default:
 			panic(fmt.Sprintf("Unexpected logical op: %d\n", node.op))
 		}
-	} else {
-		// TODO: Does this make sense?
-		return evalInternal(tweet, node.children[0])
+	default:
+		panic(fmt.Sprintf("Unexpected node type: %d", node.kind))
 	}
 }
 
@@ -132,7 +122,7 @@ func (rule *ParsedRule) Eval(tweet *Tweet) bool {
 //
 // Grammar:
 //
-// Expr    <-  ( Expr ) [Logical Expr]? | Cond [Logical Expr]?
+// Expr    <-  ( Expr ) | Cond [Logical Expr]?
 // Cond	   <-  Ident Op Literal
 // Logical <-  Or | And
 // Op      <-  Gt | Gte | Lt | Lte | Eq | Neq | In | NotIn
@@ -192,8 +182,10 @@ func newParserError(msg string, token *token) *ParserError {
 func (parser *Parser) match(kind tokenKind) (*token, error) {
 	currToken := parser.currToken
 
+	// If the current token is not a match, return the token for
+	// error reporting purposes. Do not consume the token.
 	if currToken.kind != kind {
-		return nil, fmt.Errorf(`Unexpected token - found: "%s", expected: "%s"`,
+		return currToken, fmt.Errorf(`Unexpected token - found: "%s", expected: "%s"`,
 			currToken.kind.ToString(), kind.ToString())
 	}
 
@@ -207,85 +199,67 @@ func (parser *Parser) match(kind tokenKind) (*token, error) {
 	return currToken, nil
 }
 
-func (parser *Parser) expr(parent *parseNode) (*parseNode, error) {
-	var token *token
+func (parser *Parser) expr() (*parseNode, error) {
+	var node *parseNode
 	var err error
-	var node, logicalNode *parseNode
 
-	// Step 1: Is this ( expr ) or just a cond?
-	switch parser.currToken.kind {
-	case tokenLparen:
-		_, err = parser.match(tokenLparen)
-		if err != nil {
-			return nil, err
-		}
+	for {
+		token := parser.currToken
 
-		// For an expression, we know that this a non-terminal node,
-		// so we construct a new "parent" for the expr here
-		node = &parseNode{
-			children:    make([]*parseNode, 0, 100),
-			numChildren: 0,
-			kind:        nodeExpr,
-			rule:        nil,
-		}
-
-		_, err = parser.expr(node)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = parser.match(tokenRparen)
-		if err != nil {
-			return nil, err
-		}
-	case tokenIdent:
-		// Condition
-		node, err = parser.cond()
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("Unexpected token")
-	}
-
-	// Step 2: Check if we are in the middle of a logical expression
-	switch parser.currToken.kind {
-	case tokenAnd, tokenOr:
-		token, err = parser.logical()
-		if token != nil {
-			// Logical found (TODO)
-			// Build a logical node and make it the new "parent" for the node
-			logicalNode = &parseNode{
-				children:    make([]*parseNode, 0, 2),
-				numChildren: 0,
-				kind:        nodeLogical,
-				op:          token.kind,
-				rule:        nil,
-			}
-
-			logicalNode.children = append(logicalNode.children, node)
-			logicalNode.numChildren++
-
-			parser.rule.numNodes++
-
-			_, err = parser.expr(logicalNode)
+		switch token.kind {
+		// Nested expression
+		case tokenLparen:
+			_, err = parser.match(tokenLparen)
 			if err != nil {
 				return nil, err
 			}
 
-			node = logicalNode
+			// Parse the internal expression and return the resulting node
+			node, err = parser.expr()
+			if err != nil {
+				return nil, err
+			}
+
+			token, err = parser.match(tokenRparen)
+			if err != nil {
+				return nil, err
+			}
+		// Conditional expression
+		case tokenIdent:
+			node, err = parser.cond()
+			if err != nil {
+				return nil, err
+			}
+		// Logical/binary expression
+		case tokenAnd, tokenOr:
+			// Logical expresion with no preceding expression is invalid
+			if node == nil {
+				return nil, fmt.Errorf("Unexpected logical operator at %d: %s", token.pos, token.kind.ToString())
+			}
+
+			op, err := parser.logical()
+			if err != nil {
+				return nil, err
+			}
+
+			newNode, err := parser.expr()
+			if err != nil {
+				return nil, err
+			}
+
+			node = &parseNode{
+				kind:  nodeLogical,
+				op:    op.kind,
+				rule:  nil,
+				left:  node,
+				right: newNode,
+			}
+		default:
+			return node, nil
 		}
-	default:
-		break
+
+		parser.rule.numNodes++
 	}
-
-	// Insert this node into the current parent node
-	parent.children = append(parent.children, node)
-	parent.numChildren++
-
-	parser.rule.numNodes++
-
-	return parent, nil
 }
 
 func (parser *Parser) cond() (*parseNode, error) {
@@ -419,10 +393,9 @@ func (parser *Parser) cond() (*parseNode, error) {
 	}
 
 	node := &parseNode{
-		kind:     nodeCond,
-		rule:     rule,
-		op:       op.kind,
-		children: nil,
+		kind: nodeCond,
+		rule: rule,
+		op:   op.kind,
 	}
 
 	return node, nil
@@ -486,14 +459,15 @@ func (parser *Parser) literal() (*token, error) {
 }
 
 func toStringHelper(p *parseNode, depth int, output *strings.Builder) {
-	if p.numChildren == 0 {
+	if p == nil {
 		return
 	}
 
-	for _, node := range p.children {
-		s := fmt.Sprintf("depth = %d, %s", depth, node)
-		output.WriteString(s)
-	}
+	s := fmt.Sprintf("depth = %d, %s", depth, p)
+	output.WriteString(s)
+
+	toStringHelper(p.left, depth+1, output)
+	toStringHelper(p.right, depth+1, output)
 }
 
 // ToString walks the parse tree and outputs it in string form
@@ -530,9 +504,12 @@ func (parser *Parser) Parse() (*ParsedRule, error) {
 
 	parser.currToken = token
 
-	_, err1 := parser.expr(parser.rule.root)
+	node, err := parser.expr()
 
-	return parser.rule, err1
+	// Set the root to the returned root
+	parser.rule.root = node
+
+	return parser.rule, err
 }
 
 // Parse is the entry point to the rule parser infra.
