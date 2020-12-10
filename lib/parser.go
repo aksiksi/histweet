@@ -72,16 +72,7 @@ func (node *parseNode) String() string {
 // ParsedRule represents a single parsed Rule as a tree of parseNodes.
 type ParsedRule struct {
 	root     *parseNode
-	input    string
 	numNodes int
-}
-
-func newParsedRule(input string) *ParsedRule {
-	return &ParsedRule{
-		root:     nil,
-		input:    input,
-		numNodes: 0,
-	}
 }
 
 func evalInternal(tweet *Tweet, node *parseNode) bool {
@@ -206,6 +197,8 @@ func (parser *Parser) expr() (*parseNode, error) {
 	for {
 		token := parser.currToken
 
+		// TODO(aksiksi): Handle the case of a non-logical expression that follows
+		// an expression or cond
 		switch token.kind {
 		// Nested expression
 		case tokenLparen:
@@ -483,7 +476,7 @@ func NewParser(input string) *Parser {
 
 	parser := &Parser{
 		lexer: lexer,
-		rule:  newParsedRule(input),
+		rule:  &ParsedRule{},
 	}
 
 	return parser
@@ -491,8 +484,8 @@ func NewParser(input string) *Parser {
 
 // Reset this Parser to a clean state with the provided input
 func (parser *Parser) Reset(input string) {
-	parser.lexer = newLexer(Tokens, input)
-	parser.rule = newParsedRule(input)
+	parser.lexer.Reset()
+	parser.rule = &ParsedRule{}
 }
 
 // Parse is the entry point for parser

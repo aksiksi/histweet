@@ -1,6 +1,9 @@
 package histweet
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestParser(t *testing.T) {
 	// Ensures that parser can successfully parse some known inputs, and
@@ -83,5 +86,39 @@ func TestParser(t *testing.T) {
 
 			rule.Eval(&tweet)
 		})
+	}
+}
+
+func BenchmarkParser(b *testing.B) {
+	input := `((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`
+	parser := NewParser(input)
+
+	for i := 0; i < b.N; i++ {
+		rule, err := parser.Parse()
+		if err != nil {
+			panic(err)
+		}
+
+		if rule == nil {
+			panic("Rule is invalid")
+		}
+
+		parser.Reset(input)
+	}
+}
+
+func BenchmarkEval(b *testing.B) {
+	input := `((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`
+	rule, _ := Parse(input)
+	tweet := Tweet{
+		Text:      "abc hey 123",
+		NumLikes:  10,
+		CreatedAt: time.Date(2020, 5, 11, 0, 0, 0, 0, time.UTC),
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		rule.Eval(&tweet)
 	}
 }

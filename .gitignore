@@ -3,3 +3,5 @@ histweet
 cli/cli
 server/server
 .vscode
+*.out
+*.test

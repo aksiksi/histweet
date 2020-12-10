@@ -59,3 +59,20 @@ You can view full usage by passing in the `-h` flag.
 ## Build
 
 `cd cli && go build -o histweet`
+
+## Test
+
+`cd lib && go test`
+
+## Benches
+
+```
+cd lib
+
+# Run benchmarks & dump files for CPU and mem
+go test -bench=. -benchmem -memprofile=mem.out -cpuprofile=cpu.out
+
+# Optional: analyze each file in browser using pprof
+go tool pprof -http :8080 cpu.out
+go tool pprof -http :8081 mem.out
+```
