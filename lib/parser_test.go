@@ -48,6 +48,7 @@ func TestParser(t *testing.T) {
 
 		// Unbalanced parens
 		{"(age > 3m && likes >= 34 || text !~ \"xyz\"", -1},
+		{"age > 3m && likes >= 34) || text !~ \"xyz\"", -1},
 	}
 
 	for _, input := range inputs {
@@ -66,7 +67,7 @@ func TestParser(t *testing.T) {
 			expected := input.numNodes
 
 			if numNodes != expected {
-				t.Errorf("Parsed not count %d != expected %d\n", numNodes, expected)
+				t.Errorf("Parsed count %d != expected %d\n", numNodes, expected)
 			}
 
 			s := rule.ToString()

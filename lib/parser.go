@@ -497,6 +497,12 @@ func (parser *Parser) Reset(input string) {
 
 // Parse is the entry point for parser
 func (parser *Parser) Parse() (*ParsedRule, error) {
+	// Prior to parsing a rule, check for unbalanced parens
+	err := checkUnbalancedParens(parser.lexer.input)
+	if err != nil {
+		return nil, err
+	}
+
 	token, err := parser.lexer.nextToken()
 	if err != nil {
 		return nil, err

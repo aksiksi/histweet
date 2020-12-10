@@ -7,6 +7,32 @@ import (
 	"time"
 )
 
+// Helper function to check for unbalanced parens in a given string
+func checkUnbalancedParens(input string) error {
+	var parenStack []int
+
+	for i, c := range input {
+		l := len(parenStack)
+
+		if c == '(' {
+			parenStack = append(parenStack, i)
+		} else if c == ')' {
+			if l == 0 {
+				return fmt.Errorf(`Unbalanced ")" at pos %d`, i)
+			}
+
+			parenStack = parenStack[:len(parenStack)-1]
+		}
+	}
+
+	if len(parenStack) > 0 {
+		l := len(parenStack)
+		return fmt.Errorf(`Unbalanced "(" at pos %d`, parenStack[l-1])
+	}
+
+	return nil
+}
+
 func convertAgeToTime(age string) (time.Time, error) {
 	var days int
 	var months int
