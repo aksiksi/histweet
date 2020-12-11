@@ -28,7 +28,7 @@ type RuleTweet struct {
 	Before             time.Time
 	After              time.Time
 	Match              *regexp.Regexp
-	Contains           string
+	IsNegativeMatch    bool
 	Likes              int
 	LikesComparator    ruleComparator
 	Retweets           int

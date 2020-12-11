@@ -304,6 +304,7 @@ func (parser *Parser) cond() (*parseNode, error) {
 			pat := strings.Replace(literal.val, "\"", "", 2)
 
 			rule.Match = regexp.MustCompile(pat)
+			rule.IsNegativeMatch = (op.kind == tokenNotIn)
 		default:
 			return nil, newParserError("Invalid operator for \"text\"", op)
 		}
@@ -456,7 +457,7 @@ func toStringHelper(p *parseNode, depth int, output *strings.Builder) {
 		return
 	}
 
-	s := fmt.Sprintf("depth = %d, %s", depth, p)
+	s := fmt.Sprintf("depth = %d, %s\n", depth, p)
 	output.WriteString(s)
 
 	toStringHelper(p.left, depth+1, output)

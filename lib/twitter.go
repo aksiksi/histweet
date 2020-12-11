@@ -83,7 +83,14 @@ func (tweet *Tweet) IsMatch(rule *RuleTweet) bool {
 	}
 
 	if rule.Match != nil {
-		isMatch = isMatch && (rule.Match.FindStringIndex(tweet.Text) != nil)
+		reMatch := rule.Match.FindStringIndex(tweet.Text) != nil
+
+		// In case of a negative match, negate the result
+		if rule.IsNegativeMatch {
+			reMatch = !reMatch
+		}
+
+		isMatch = isMatch && reMatch
 	}
 
 	if rule.Likes > 0 {

@@ -89,6 +89,57 @@ func TestParser(t *testing.T) {
 	}
 }
 
+func TestParserEval(t *testing.T) {
+	// Checks that parser evaluates rules correctly
+	var inputs = []struct {
+		rule  string
+		tweet Tweet
+	}{
+		{"likes == 34 && retweets == 2", Tweet{NumLikes: 34, NumRetweets: 2}},
+		{"likes != 34 && retweets != 2", Tweet{NumLikes: 10, NumRetweets: 5}},
+		{"likes != 34 || retweets == 2", Tweet{NumLikes: 34, NumRetweets: 2}},
+		{"(likes != 34) || retweets == 2", Tweet{NumLikes: 34, NumRetweets: 2}},
+		{"likes >= 34 && retweets >= 2", Tweet{NumLikes: 35, NumRetweets: 2}},
+		{"likes <= 34 && retweets <= 2", Tweet{NumLikes: 33, NumRetweets: 2}},
+		{"likes > 34 && retweets > 2", Tweet{NumLikes: 35, NumRetweets: 3}},
+		{"likes < 34 && retweets < 2", Tweet{NumLikes: 33, NumRetweets: 1}},
+		{"age > 3m && likes < 100", Tweet{
+			CreatedAt: time.Now().AddDate(0, -3, -1),
+			NumLikes:  99,
+		}},
+		{`text ~ "def" && retweets == 3`, Tweet{
+			Text:        "def",
+			NumRetweets: 3,
+		}},
+		{`((text !~ "abc") && (likes == 5)) || created < 10-May-2020 || likes == 9`, Tweet{
+			Text:     "def",
+			NumLikes: 5,
+		}},
+		{`((text !~ "abc") && (likes == 5)) || created < 10-May-2020 || likes == 9`, Tweet{
+			Text:      "abc",
+			NumLikes:  6,
+			CreatedAt: time.Date(2020, 5, 11, 0, 0, 0, 0, time.UTC),
+		}},
+		{`((text !~ "abc") && (likes == 5)) || created < 10-May-2020 || likes == 9`, Tweet{
+			NumLikes: 9,
+		}},
+	}
+
+	for _, input := range inputs {
+		t.Run(input.rule, func(t *testing.T) {
+			rule, err := Parse(input.rule)
+			if err != nil {
+				t.Errorf("Failed to parse rule: %s", err)
+			}
+
+			isMatch := rule.Eval(&input.tweet)
+			if !isMatch {
+				t.Errorf("Failed to evaluate rule: %s, %v", input.rule, input.tweet)
+			}
+		})
+	}
+}
+
 func BenchmarkParser(b *testing.B) {
 	input := `((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`
 	parser := NewParser(input)
