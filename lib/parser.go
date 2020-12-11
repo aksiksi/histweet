@@ -156,7 +156,7 @@ type ParserError struct {
 }
 
 func (err *ParserError) Error() string {
-	return fmt.Sprintf("%s: \"%s\" (%s) (at col %d)", err.msg, err.val, err.kind.ToString(), err.pos)
+	return fmt.Sprintf("%s: \"%s\" (%s) (at col %d)", err.msg, err.val, err.kind.ToString(), err.pos+1)
 }
 
 func newParserError(msg string, token *token) *ParserError {
