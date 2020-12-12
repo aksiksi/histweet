@@ -159,11 +159,13 @@ func BenchmarkParser(b *testing.B) {
 }
 
 func BenchmarkEval(b *testing.B) {
-	input := `((text !~ "hey!") && (likes == 5)) || created < 10-May-2020 || likes == 9`
+	input := `
+		(((text !~ "hey!") && (likes == 5)) && text ~ "abc") || (created < 10-May-2020 || likes == 9) && (age > 1d || likes == 9)
+	`
 	rule, _ := Parse(input)
 	tweet := Tweet{
 		Text:      "abc hey 123",
-		NumLikes:  10,
+		NumLikes:  9,
 		CreatedAt: time.Date(2020, 5, 11, 0, 0, 0, 0, time.UTC),
 	}
 
