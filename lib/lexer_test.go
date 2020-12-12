@@ -115,3 +115,32 @@ func TestLexer(t *testing.T) {
 		})
 	}
 }
+
+// Dummy test to trigger ToString() for lexer token kinds
+func TestLexerTokenKinds(t *testing.T) {
+	kinds := []tokenKind{
+		tokenIdent,
+		tokenNumber,
+		tokenString,
+		tokenAge,
+		tokenTime,
+		tokenLparen,
+		tokenRparen,
+		tokenOr,
+		tokenAnd,
+		tokenGte,
+		tokenGt,
+		tokenLte,
+		tokenLt,
+		tokenEq,
+		tokenNeq,
+		tokenIn,
+		tokenNotIn,
+		tokenEOF,
+		9999,
+	}
+
+	for _, kind := range kinds {
+		kind.ToString()
+	}
+}
