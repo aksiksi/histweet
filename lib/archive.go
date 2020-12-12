@@ -2,6 +2,7 @@ package histweet
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -60,22 +61,26 @@ func FetchArchiveTweets(rule *ParsedRule, archive string) ([]Tweet, error) {
 	}
 
 	// Find file size
-	info, err = f.Stat()
+	info, _ = f.Stat()
 	if err != nil {
 		return nil, err
 	}
+
+	headerSize := int64(len(archiveSkipHeader))
 
 	fileSize := info.Size()
+	if fileSize <= headerSize {
+		return nil, fmt.Errorf("Input archive size (%d bytes) is too small", fileSize)
+	}
 
-	// Skip some characters to get to valid JSON
-	numSkip := int64(len(archiveSkipHeader))
-	_, err = f.Seek(numSkip, 0)
+	// Skip header to get to valid JSON
+	_, err = f.Seek(headerSize, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	// Allocate buffer of exact size to hold JSON
-	buf := make([]byte, fileSize-numSkip)
+	// Allocate buffer of exact size to hold raw JSON string
+	buf := make([]byte, fileSize-headerSize)
 	_, err = f.Read(buf)
 	if err != nil {
 		return nil, err
